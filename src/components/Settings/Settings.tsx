@@ -11,12 +11,21 @@ export const Settings: React.FC = () => {
 
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState(settings.openaiApiKey || "");
+  const [googleClientId, setGoogleClientId] = useState(settings.googleClientId || "");
+  const [googleApiKey, setGoogleApiKey] = useState(settings.googleApiKey || "");
   const [isSaved, setIsSaved] = useState(false);
+  const [isGoogleSaved, setIsGoogleSaved] = useState(false);
 
   const handleSaveApiKey = () => {
     setApiKey(apiKeyInput);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2000);
+  };
+
+  const handleSaveGoogleCredentials = () => {
+    updateSettings({ googleClientId, googleApiKey });
+    setIsGoogleSaved(true);
+    setTimeout(() => setIsGoogleSaved(false), 2000);
   };
 
   const toggleDefaultFormat = (format: VideoFormat) => {
@@ -93,6 +102,60 @@ export const Settings: React.FC = () => {
                     platform.openai.com
                   </a>
                 </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Google Drive Integration */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Google Drive Integration</CardTitle>
+            <CardDescription>
+              Optional: Enable importing audio files directly from Google Drive
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <Input
+                label="Google Client ID"
+                value={googleClientId}
+                onChange={(e) => setGoogleClientId(e.target.value)}
+                placeholder="your-client-id.apps.googleusercontent.com"
+              />
+              <Input
+                label="Google API Key"
+                value={googleApiKey}
+                onChange={(e) => setGoogleApiKey(e.target.value)}
+                placeholder="AIza..."
+              />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-[hsl(var(--muted-foreground))]">
+                  Get credentials from{" "}
+                  <a
+                    href="https://console.cloud.google.com/apis/credentials"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[hsl(var(--primary))] hover:underline"
+                  >
+                    Google Cloud Console
+                  </a>
+                  . Enable the Google Drive API and Google Picker API.
+                </p>
+                <Button
+                  onClick={handleSaveGoogleCredentials}
+                  disabled={!googleClientId || !googleApiKey}
+                  size="sm"
+                >
+                  {isGoogleSaved ? (
+                    <>
+                      <CheckIcon className="w-4 h-4 mr-1" />
+                      Saved
+                    </>
+                  ) : (
+                    "Save"
+                  )}
+                </Button>
               </div>
             </div>
           </CardContent>
