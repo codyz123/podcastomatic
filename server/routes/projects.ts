@@ -18,6 +18,12 @@ import {
 
 const router = Router();
 
+// Helper to extract string param (Express params can be string | string[])
+function getParam(param: string | string[] | undefined): string {
+  if (Array.isArray(param)) return param[0] || "";
+  return param || "";
+}
+
 // Configure multer for file uploads (50MB limit for audio/video)
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -38,7 +44,7 @@ router.get("/projects", async (_req: Request, res: Response) => {
 // Get a single project with its clips
 router.get("/projects/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = getParam(req.params.id);
     const project = await getProject(id);
 
     if (!project) {
@@ -77,7 +83,7 @@ router.post("/projects", async (req: Request, res: Response) => {
 // Upload source media for a project
 router.post("/projects/:id/source", upload.single("file"), async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = getParam(req.params.id);
     const file = req.file;
 
     if (!file) {
@@ -110,7 +116,7 @@ router.post("/projects/:id/source", upload.single("file"), async (req: Request, 
 // Delete a project
 router.delete("/projects/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = getParam(req.params.id);
     await deleteProject(id);
     res.json({ success: true });
   } catch (error) {
@@ -122,7 +128,7 @@ router.delete("/projects/:id", async (req: Request, res: Response) => {
 // Create or update a clip
 router.post("/projects/:projectId/clips", async (req: Request, res: Response) => {
   try {
-    const { projectId } = req.params;
+    const projectId = getParam(req.params.projectId);
     const { id, name, startTime, endTime, transcriptSegments, templateId, format } = req.body;
 
     if (!id || !name || startTime === undefined || endTime === undefined) {
@@ -151,7 +157,7 @@ router.post("/projects/:projectId/clips", async (req: Request, res: Response) =>
 // Bulk sync clips for a project
 router.put("/projects/:projectId/clips", async (req: Request, res: Response) => {
   try {
-    const { projectId } = req.params;
+    const projectId = getParam(req.params.projectId);
     const { clips } = req.body;
 
     if (!Array.isArray(clips)) {
@@ -182,7 +188,7 @@ router.put("/projects/:projectId/clips", async (req: Request, res: Response) => 
 // Delete a clip
 router.delete("/clips/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = getParam(req.params.id);
     await deleteClip(id);
     res.json({ success: true });
   } catch (error) {
@@ -197,7 +203,7 @@ router.post(
   upload.single("file"),
   async (req: Request, res: Response) => {
     try {
-      const { projectId } = req.params;
+      const projectId = getParam(req.params.projectId);
       const { id, type, name, durationSeconds, width, height, metadata } = req.body;
       const file = req.file;
 
@@ -245,7 +251,7 @@ router.post(
 // Delete a media asset
 router.delete("/assets/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = getParam(req.params.id);
     await deleteMediaAsset(id);
     res.json({ success: true });
   } catch (error) {
@@ -260,7 +266,7 @@ router.post(
   upload.single("file"),
   async (req: Request, res: Response) => {
     try {
-      const { clipId } = req.params;
+      const clipId = getParam(req.params.clipId);
       const { id, format } = req.body;
       const file = req.file;
 
@@ -302,7 +308,7 @@ router.post(
 // Get rendered clips for a clip
 router.get("/clips/:clipId/rendered", async (req: Request, res: Response) => {
   try {
-    const { clipId } = req.params;
+    const clipId = getParam(req.params.clipId);
     const renderedClips = await getRenderedClipsForClip(clipId);
     res.json({ renderedClips });
   } catch (error) {
