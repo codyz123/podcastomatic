@@ -41,7 +41,16 @@ export function usePodcast() {
     fetchPodcast();
   }, [fetchPodcast]);
 
-  const inviteMember = async (email: string): Promise<{ status: "added" | "invited" }> => {
+  const inviteMember = async (
+    email: string
+  ): Promise<{
+    status: "added" | "invited";
+    emailSent?: boolean;
+    emailError?: string;
+    emailErrorCode?: "NOT_CONFIGURED" | "TESTING_DOMAIN" | "API_ERROR" | "UNKNOWN";
+    invitationUrl?: string;
+    message?: string;
+  }> => {
     if (!currentPodcastId) {
       throw new Error("No podcast selected");
     }
@@ -94,6 +103,31 @@ export function usePodcast() {
     }
 
     await fetchPodcast(); // Refresh the podcast data
+  };
+
+  const resendInvitation = async (
+    invitationId: string
+  ): Promise<{
+    success: boolean;
+    emailSent?: boolean;
+    emailError?: string;
+    errorCode?: "NOT_CONFIGURED" | "TESTING_DOMAIN" | "API_ERROR" | "UNKNOWN";
+    invitationUrl?: string;
+    message?: string;
+  }> => {
+    if (!currentPodcastId) {
+      throw new Error("No podcast selected");
+    }
+
+    const url = `${getApiBase()}/api/podcasts/${currentPodcastId}/invitations/${invitationId}/resend`;
+    const res = await authFetch(url, { method: "POST" });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Failed to resend invitation");
+    }
+
+    return await res.json();
   };
 
   const createPodcast = async (name: string, description?: string): Promise<void> => {
@@ -201,6 +235,7 @@ export function usePodcast() {
     inviteMember,
     removeMember,
     cancelInvitation,
+    resendInvitation,
     createPodcast,
     updatePodcast,
     deletePodcast,

@@ -5,21 +5,22 @@ import { PlanningPage } from "./Planning/PlanningPage";
 
 export type ViewType =
   | "projects"
+  | "info"
+  | "planning"
   | "import"
+  | "record"
   | "transcript"
   | "clips"
   | "editor"
   | "export"
-  | "publish"
   | "text-content"
   | "settings";
 
 interface LayoutProps {
   children: React.ReactNode;
   currentView: ViewType;
-  onViewChange: (view: ViewType) => void;
-  activeStage: EpisodeStage;
-  activeSubStage: string;
+  activeStage?: EpisodeStage;
+  activeSubStage?: string;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -42,7 +43,7 @@ export const Layout: React.FC<LayoutProps> = ({
           {activeStage === "info" && currentView !== "projects" ? (
             <EpisodeInfoPage />
           ) : activeStage === "planning" && currentView !== "projects" ? (
-            <PlanningPage activeSubStage={activeSubStage as PlanningSubStage} />
+            <PlanningPage activeSubStage={(activeSubStage as PlanningSubStage) || "guests"} />
           ) : currentView === "editor" ? (
             <div className="h-full">{children}</div>
           ) : (

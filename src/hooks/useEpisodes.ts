@@ -180,7 +180,16 @@ export function useEpisodes() {
   // Update an episode
   const updateEpisode = useCallback(
     async (episodeId: string, updates: Partial<Episode>): Promise<Episode | null> => {
-      if (!currentPodcastId) return null;
+      console.log(
+        "[useEpisodes.updateEpisode] Called with episodeId:",
+        episodeId,
+        "currentPodcastId:",
+        currentPodcastId
+      );
+      if (!currentPodcastId) {
+        console.error("[useEpisodes.updateEpisode] No currentPodcastId - returning null");
+        return null;
+      }
 
       try {
         const res = await authFetch(
@@ -387,6 +396,34 @@ export function useEpisodes() {
     ): Promise<Record<string, { status: string; updatedAt?: string }> | null> => {
       if (!currentPodcastId) return null;
 
+      const prevEpisode = episodes.find((e) => e.id === episodeId);
+      const previousStageStatus = prevEpisode?.stageStatus || {};
+      const optimisticStageStatus = {
+        ...previousStageStatus,
+        [stage]: { status, updatedAt: new Date().toISOString() },
+      };
+
+      const applyStageStatus = (
+        nextStageStatus: Record<string, { status: string; updatedAt?: string }>
+      ) => {
+        setEpisodes((prev) =>
+          prev.map((episode) =>
+            episode.id === episodeId ? { ...episode, stageStatus: nextStageStatus } : episode
+          )
+        );
+
+        if (currentEpisode?.id === episodeId) {
+          setCurrentEpisode((prev) => (prev ? { ...prev, stageStatus: nextStageStatus } : prev));
+        }
+
+        const projectState = useProjectStore.getState();
+        if (projectState.currentProject?.id === episodeId) {
+          projectState.updateProject({ stageStatus: nextStageStatus });
+        }
+      };
+
+      applyStageStatus(optimisticStageStatus);
+
       try {
         const res = await authFetch(
           `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}/stage-status`,
@@ -403,13 +440,17 @@ export function useEpisodes() {
         }
 
         const { stageStatus } = await res.json();
+        if (stageStatus) {
+          applyStageStatus(stageStatus);
+        }
         return stageStatus;
       } catch (err) {
+        applyStageStatus(previousStageStatus);
         setError(err instanceof Error ? err.message : "Failed to update stage status");
         return null;
       }
     },
-    [currentPodcastId]
+    [currentPodcastId, episodes, currentEpisode]
   );
 
   // Track if we've attempted migration in this session

@@ -107,7 +107,7 @@ describe("Error Handling", () => {
       .attach("file", audioBuffer, "test.mp3");
 
     expect(response.status).toBe(500);
-    expect(response.body.error).toBe("Server misconfigured");
+    expect(response.body.error).toBe("OpenAI API key not configured on server");
   });
 
   it("should provide actionable error messages", async () => {

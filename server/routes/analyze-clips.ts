@@ -13,7 +13,9 @@ interface AnalyzeClipsRequest {
 }
 
 router.post("/analyze-clips", async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const headerKey = req.headers["x-openai-key"];
+  const headerValue = Array.isArray(headerKey) ? headerKey[0] : headerKey;
+  const apiKey = process.env.OPENAI_API_KEY || headerValue;
   if (!apiKey) {
     res.status(500).json({ error: "OpenAI API key not configured on server" });
     return;

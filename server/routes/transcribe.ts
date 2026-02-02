@@ -73,7 +73,7 @@ async function transcribeSingleFile(
     timestamp_granularities: ["word"],
     // Prompt helps Whisper understand context and improves accuracy
     prompt:
-      "This is a podcast conversation with natural speech, including filler words, pauses, and conversational language.",
+      "This is a podcast conversation with natural speech. Transcribe only spoken words; ignore music, singing, and other non-speech audio. Do not include lyrics or music notation.",
   });
 
   return {
@@ -127,7 +127,9 @@ function mergeTranscriptions(
 }
 
 router.post("/transcribe", upload.single("file"), async (req: Request, res: Response) => {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const headerKey = req.headers["x-openai-key"];
+  const headerValue = Array.isArray(headerKey) ? headerKey[0] : headerKey;
+  const apiKey = process.env.OPENAI_API_KEY || headerValue;
   const filesToCleanup: string[] = [];
 
   // Check if client wants SSE streaming
@@ -135,7 +137,7 @@ router.post("/transcribe", upload.single("file"), async (req: Request, res: Resp
 
   if (!apiKey) {
     console.error("OPENAI_API_KEY environment variable not set");
-    res.status(500).json({ error: "Server misconfigured" });
+    res.status(500).json({ error: "OpenAI API key not configured on server" });
     return;
   }
 
