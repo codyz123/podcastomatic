@@ -1,5 +1,4 @@
 import React from "react";
-import { FileIcon } from "@radix-ui/react-icons";
 import { cn } from "../lib/utils";
 import { useProjectStore } from "../stores/projectStore";
 import { EpisodeStage, PlanningSubStage } from "./EpisodePipeline/EpisodePipeline";
@@ -39,24 +38,6 @@ export const Layout: React.FC<LayoutProps> = ({
 
   return (
     <div className="relative z-10 flex h-full flex-col overflow-hidden">
-      {/* Projects Quick Access - when on project views */}
-      {!hasProject && currentView === "projects" && (
-        <div
-          className={cn(
-            "flex h-12 items-center justify-center",
-            "bg-gradient-to-r from-[hsl(var(--cyan)/0.05)] via-transparent to-[hsl(var(--magenta)/0.05)]",
-            "border-b border-[hsl(0_0%_100%/0.04)]"
-          )}
-        >
-          <div className="flex items-center gap-2 text-[13px]">
-            <FileIcon className="h-4 w-4 text-[hsl(var(--cyan))]" />
-            <span className="text-[hsl(var(--text-muted))]">
-              Select a project to begin your workflow
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Main Content */}
       <main className="relative flex-1 overflow-hidden">
         {/* Decorative gradient orbs */}
