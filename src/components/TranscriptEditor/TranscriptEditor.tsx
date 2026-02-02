@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   ReloadIcon,
   CheckIcon,
@@ -12,10 +12,12 @@ import { Button, Card, CardContent, Input } from "../ui";
 import { Progress, Spinner } from "../ui/Progress";
 import { useProjectStore, getAudioBlob } from "../../stores/projectStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useAuthStore } from "../../stores/authStore";
 import { useEpisodes } from "../../hooks/useEpisodes";
 import { Transcript, Word } from "../../lib/types";
 import { generateId, cn } from "../../lib/utils";
 import { formatTimestamp, formatRelativeTime } from "../../lib/formats";
+import { authFetch } from "../../lib/api";
 
 interface TranscriptEditorProps {
   onComplete: () => void;
@@ -28,6 +30,9 @@ interface ProgressState {
   detail?: string;
 }
 
+const TRANSCRIPTION_PROMPT =
+  "This is a podcast conversation with natural speech. Transcribe only spoken words; ignore music, singing, and other non-speech audio. Do not include lyrics or music notation.";
+
 export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }) => {
   const {
     currentProject,
@@ -38,6 +43,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
     updateTranscriptWord,
   } = useProjectStore();
   const { settings } = useSettingsStore();
+  const accessToken = useAuthStore((state) => state.accessToken);
   const { saveTranscript } = useEpisodes();
 
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -58,12 +64,37 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
   const [activeWordIndex, setActiveWordIndex] = useState<number>(-1);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const wordRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const activeWordIndexRef = useRef<number>(-1);
+  const lastTimeRef = useRef<number>(0);
 
   // Get active transcript (handles both legacy and new format)
   const activeTranscript = getActiveTranscript();
   const transcripts = currentProject?.transcripts || [];
   const hasTranscript = !!activeTranscript;
   const hasMultipleTranscripts = transcripts.length > 1;
+  const timedWords = useMemo(() => {
+    if (!activeTranscript?.words || activeTranscript.words.length === 0) return [];
+
+    const normalized: Word[] = [];
+    let lastStart = -Infinity;
+
+    for (const word of activeTranscript.words) {
+      let start = Number.isFinite(word.start) ? word.start : lastStart + 0.02;
+      if (start <= lastStart) {
+        start = lastStart + 0.02;
+      }
+
+      let end = Number.isFinite(word.end) ? word.end : start + 0.12;
+      if (end <= start) {
+        end = start + 0.12;
+      }
+
+      normalized.push({ ...word, start, end });
+      lastStart = start;
+    }
+
+    return normalized;
+  }, [activeTranscript?.words]);
 
   // Load audio URL from IndexedDB or blob URL
   useEffect(() => {
@@ -88,12 +119,12 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
   }, [currentProject?.id, currentProject?.audioPath]);
 
   // Find active word based on current playback time using binary search
-  // Returns the last word whose start time is <= current time
+  // Returns the active word, accounting for duplicate start times and missing end timestamps.
   const findActiveWord = useCallback(
     (time: number) => {
-      if (!activeTranscript?.words || activeTranscript.words.length === 0) return -1;
+      if (!timedWords || timedWords.length === 0) return -1;
 
-      const words = activeTranscript.words;
+      const words = timedWords;
 
       // If before first word, no highlight
       if (time < words[0].start) return -1;
@@ -113,9 +144,38 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
         }
       }
 
+      if (result === -1) return -1;
+
+      const getEffectiveEnd = (index: number) => {
+        const word = words[index];
+        if (Number.isFinite(word.end) && word.end > word.start) {
+          return word.end;
+        }
+
+        const next = words[index + 1];
+        if (next && Number.isFinite(next.start) && next.start > word.start) {
+          return next.start;
+        }
+
+        return word.start + 0.12;
+      };
+
+      // Handle identical start times by selecting the earliest word whose end still includes the time.
+      const targetStart = words[result].start;
+      let first = result;
+      while (first > 0 && words[first - 1].start === targetStart) {
+        first--;
+      }
+
+      for (let i = first; i <= result; i++) {
+        if (time <= getEffectiveEnd(i) + 0.001) {
+          return i;
+        }
+      }
+
       return result;
     },
-    [activeTranscript?.words]
+    [timedWords]
   );
 
   // Handle audio time updates with requestAnimationFrame for smooth highlighting
@@ -131,7 +191,20 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
         const time = audio.currentTime;
         setCurrentTime(time);
         const newActiveIndex = findActiveWord(time);
-        setActiveWordIndex(newActiveIndex);
+        const prevIndex = activeWordIndexRef.current;
+        const timeJump = Math.abs(time - lastTimeRef.current) > 0.75;
+
+        let nextIndex = newActiveIndex;
+        if (!timeJump && prevIndex >= 0 && newActiveIndex > prevIndex + 1) {
+          nextIndex = prevIndex + 1;
+        }
+
+        if (nextIndex !== prevIndex) {
+          setActiveWordIndex(nextIndex);
+          activeWordIndexRef.current = nextIndex;
+        }
+
+        lastTimeRef.current = time;
         animationFrameId = requestAnimationFrame(updateTime);
       }
     };
@@ -139,6 +212,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
     const handlePlay = () => {
       setIsPlaying(true);
       isPlayingLocal = true;
+      lastTimeRef.current = audio.currentTime;
       animationFrameId = requestAnimationFrame(updateTime);
     };
 
@@ -152,6 +226,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
       setIsPlaying(false);
       isPlayingLocal = false;
       setActiveWordIndex(-1);
+      activeWordIndexRef.current = -1;
       cancelAnimationFrame(animationFrameId);
     };
 
@@ -159,7 +234,10 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
     const handleSeeked = () => {
       const time = audio.currentTime;
       setCurrentTime(time);
-      setActiveWordIndex(findActiveWord(time));
+      const nextIndex = findActiveWord(time);
+      setActiveWordIndex(nextIndex);
+      activeWordIndexRef.current = nextIndex;
+      lastTimeRef.current = time;
     };
 
     audio.addEventListener("play", handlePlay);
@@ -199,11 +277,12 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
 
   // Seek to word when clicked (while playing)
   const seekToWord = (index: number) => {
-    if (!audioRef.current || !activeTranscript?.words[index]) return;
+    if (!audioRef.current || !timedWords[index]) return;
 
-    const word = activeTranscript.words[index];
+    const word = timedWords[index];
     audioRef.current.currentTime = word.start;
     setActiveWordIndex(index);
+    activeWordIndexRef.current = index;
 
     // If not playing, start playback
     if (!isPlaying) {
@@ -211,19 +290,71 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
     }
   };
 
+  const shouldDropWord = (token: string) => {
+    const trimmed = token.trim();
+    if (!trimmed) return true;
+    if (/^[♪♫]+$/.test(trimmed)) return true;
+
+    const lower = trimmed.toLowerCase();
+    if (lower === "music" || lower === "singing" || lower === "instrumental") return true;
+
+    if (
+      (trimmed.startsWith("[") && trimmed.endsWith("]")) ||
+      (trimmed.startsWith("(") && trimmed.endsWith(")"))
+    ) {
+      const inner = trimmed.slice(1, -1).toLowerCase();
+      if (/(music|singing|instrumental|applause|laughter|noise)/.test(inner)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const buildTranscriptWords = (rawWords: any[], fallbackText?: string): Word[] => {
+    const mapped =
+      rawWords?.map((w: any) => ({
+        text: w.word,
+        start: w.start,
+        end: w.end,
+        confidence: w.probability ?? 1,
+      })) || [];
+
+    let filtered = mapped.filter((w) => !shouldDropWord(w.text));
+
+    if (filtered.length === 0 && fallbackText) {
+      const textWords = fallbackText.split(/\s+/).filter((word) => !shouldDropWord(word));
+      const duration = currentProject?.audioDuration || 60;
+      const avgWordDuration = textWords.length > 0 ? duration / textWords.length : 0.2;
+
+      filtered = textWords.map((word: string, i: number) => ({
+        text: word,
+        start: i * avgWordDuration,
+        end: (i + 1) * avgWordDuration,
+        confidence: 0.8,
+      }));
+    }
+
+    return filtered;
+  };
+
   // Check if backend is configured
-  const useBackend = !!(settings.backendUrl && settings.accessCode);
+  const useBackend = !!settings.backendUrl;
 
   const startTranscription = async () => {
-    if (!currentProject?.audioPath) {
-      setError("No audio file loaded");
+    if (!currentProject?.id) {
+      setError("No episode selected");
       return;
     }
 
     // Check auth requirements
     if (useBackend) {
-      if (!settings.backendUrl || !settings.accessCode) {
-        setError("Please configure backend URL and access code in Settings");
+      if (!settings.backendUrl) {
+        setError("Please configure the backend URL in Settings");
+        return;
+      }
+      if (!settings.accessCode && !accessToken) {
+        setError("Please sign in or set an access code in Settings to use the backend.");
         return;
       }
     } else {
@@ -252,6 +383,12 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
       let audioBlob = currentProject.id ? await getAudioBlob(currentProject.id) : undefined;
 
       if (!audioBlob) {
+        if (!currentProject.audioPath) {
+          setError("Audio file not available. Please re-import your audio file.");
+          setIsTranscribing(false);
+          return;
+        }
+
         try {
           const response = await fetch(currentProject.audioPath);
           audioBlob = await response.blob();
@@ -304,12 +441,19 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
 
       if (useBackend) {
         // Use SSE streaming for real-time progress
-        const response = await fetch(`${settings.backendUrl}/api/transcribe`, {
+        const headers = new Headers({
+          Accept: "text/event-stream",
+        });
+        if (settings.accessCode) {
+          headers.set("X-Access-Code", settings.accessCode);
+        }
+        if (settings.openaiApiKey) {
+          headers.set("X-OpenAI-Key", settings.openaiApiKey);
+        }
+
+        const response = await authFetch(`${settings.backendUrl}/api/transcribe`, {
           method: "POST",
-          headers: {
-            "X-Access-Code": settings.accessCode!,
-            Accept: "text/event-stream",
-          },
+          headers,
           body: formData,
         });
 
@@ -373,33 +517,19 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
         }
 
         // Process the response
-        const words: Word[] = (transcriptResponse.words || []).map((w: any) => ({
-          text: w.word,
-          start: w.start,
-          end: w.end,
-          confidence: 1,
-        }));
-
-        if (words.length === 0 && transcriptResponse.text) {
-          const textWords = transcriptResponse.text.split(/\s+/);
-          const duration = currentProject.audioDuration || 60;
-          const avgWordDuration = duration / textWords.length;
-
-          textWords.forEach((word: string, i: number) => {
-            words.push({
-              text: word,
-              start: i * avgWordDuration,
-              end: (i + 1) * avgWordDuration,
-              confidence: 0.8,
-            });
-          });
-        }
+        const rawWords = transcriptResponse.words || [];
+        const words: Word[] = buildTranscriptWords(rawWords, transcriptResponse.text);
+        const hadFiltering = Array.isArray(rawWords) && words.length < rawWords.length;
+        const transcriptText =
+          hadFiltering || !transcriptResponse.text
+            ? words.map((w) => w.text).join(" ")
+            : transcriptResponse.text;
 
         const transcript: Transcript = {
           id: generateId(),
           projectId: currentProject.id,
           audioFingerprint: currentProject.audioFingerprint,
-          text: transcriptResponse.text || words.map((w) => w.text).join(" "),
+          text: transcriptText,
           words,
           language: transcriptResponse.language || "en",
           createdAt: new Date().toISOString(),
@@ -434,6 +564,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
         formData.append("model", "whisper-1");
         formData.append("response_format", "verbose_json");
         formData.append("timestamp_granularities[]", "word");
+        formData.append("prompt", TRANSCRIPTION_PROMPT);
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3600000);
@@ -458,18 +589,19 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
 
         const transcriptResponse = await res.json();
 
-        const words: Word[] = (transcriptResponse.words || []).map((w: any) => ({
-          text: w.word,
-          start: w.start,
-          end: w.end,
-          confidence: 1,
-        }));
+        const rawWords = transcriptResponse.words || [];
+        const words: Word[] = buildTranscriptWords(rawWords, transcriptResponse.text);
+        const hadFiltering = Array.isArray(rawWords) && words.length < rawWords.length;
+        const transcriptText =
+          hadFiltering || !transcriptResponse.text
+            ? words.map((w) => w.text).join(" ")
+            : transcriptResponse.text;
 
         const transcript: Transcript = {
           id: generateId(),
           projectId: currentProject.id,
           audioFingerprint: currentProject.audioFingerprint,
-          text: transcriptResponse.text || words.map((w) => w.text).join(" "),
+          text: transcriptText,
           words,
           language: transcriptResponse.language || "en",
           createdAt: new Date().toISOString(),
@@ -498,8 +630,13 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
       const message = err instanceof Error ? err.message : "Transcription failed";
 
       if (useBackend) {
-        if (message.includes("401") || message.includes("Access code required")) {
-          setError("Invalid access code. Please check your settings.");
+        if (
+          message.includes("401") ||
+          message.includes("Access code required") ||
+          message.toLowerCase().includes("authentication required") ||
+          message.toLowerCase().includes("invalid or expired token")
+        ) {
+          setError("Please sign in again or verify your access code in Settings.");
         } else if (message.includes("403")) {
           setError("Invalid access code.");
         } else if (
@@ -507,6 +644,10 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
           message.toLowerCase().includes("network")
         ) {
           setError("Cannot reach backend server. Check the URL in Settings.");
+        } else if (message.toLowerCase().includes("openai api key not configured")) {
+          setError(
+            "Backend is missing an OpenAI API key. Add OPENAI_API_KEY on the server or set your OpenAI key in Settings."
+          );
         } else {
           setError(message);
         }
@@ -584,16 +725,6 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
       <div className="mx-auto max-w-3xl">
         {/* Header */}
         <div className="mb-8 sm:mb-10">
-          <div
-            className={cn(
-              "mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1",
-              "bg-[hsl(var(--surface))]",
-              "border border-[hsl(var(--glass-border))]"
-            )}
-          >
-            <span className="text-xs font-semibold text-[hsl(var(--cyan))]">2</span>
-            <span className="text-xs font-medium text-[hsl(var(--text-subtle))]">Step 2 of 5</span>
-          </div>
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[hsl(var(--text))] sm:text-3xl">
             Transcribe Audio
           </h1>
@@ -875,6 +1006,12 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({ onComplete }
                   {hasMultipleTranscripts ? "New version" : "Re-transcribe"}
                 </Button>
               </div>
+
+              {error && (
+                <div className="mb-4 rounded-lg border border-[hsl(var(--error)/0.2)] bg-[hsl(0_50%_15%/0.4)] p-3">
+                  <p className="text-sm font-medium text-[hsl(var(--error))]">{error}</p>
+                </div>
+              )}
 
               {/* Words */}
               <div

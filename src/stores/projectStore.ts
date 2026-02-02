@@ -466,427 +466,450 @@ interface ProjectState {
   addExportRecord: (record: Omit<ExportRecord, "id" | "exportedAt">) => void;
 }
 
+type ProjectStateSetter = (
+  partial:
+    | ProjectState
+    | Partial<ProjectState>
+    | ((state: ProjectState) => ProjectState | Partial<ProjectState>),
+  replace?: false
+) => void;
+
+let projectStoreSetState: ProjectStateSetter | null = null;
+
 export const useProjectStore = create<ProjectState>()(
   persist(
-    (set, get) => ({
-      currentProject: null,
-      projects: [],
-      renderQueue: [],
+    (set, get) => {
+      projectStoreSetState = set;
+      return {
+        currentProject: null,
+        projects: [],
+        renderQueue: [],
 
-      createProject: (name, audioPath, audioDuration) => {
-        const project: Project = {
-          id: generateId(),
-          name,
-          audioPath,
-          audioDuration,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          transcripts: [],
-          clips: [],
-          exportHistory: [],
-        };
-
-        set((state) => ({
-          projects: [...state.projects, project],
-          currentProject: project,
-        }));
-
-        return project;
-      },
-
-      loadProject: (projectId) => {
-        const project = get().projects.find((p) => p.id === projectId);
-        if (project) {
-          // Set project immediately with whatever transcripts are in memory
-          const migratedProject = {
-            ...project,
-            transcripts: project.transcripts || [],
-            activeTranscriptId: project.activeTranscriptId,
-          };
-          set({ currentProject: migratedProject });
-
-          // Load transcripts from IndexedDB (async) and update state
-          getTranscriptsFromDB(projectId).then((transcripts) => {
-            const currentProject = get().currentProject;
-            if (currentProject?.id === projectId && transcripts.length > 0) {
-              const activeId =
-                currentProject.activeTranscriptId || transcripts[transcripts.length - 1].id;
-              const activeTranscript =
-                transcripts.find((t) => t.id === activeId) || transcripts[transcripts.length - 1];
-
-              set((state) => ({
-                currentProject: {
-                  ...state.currentProject!,
-                  transcripts,
-                  activeTranscriptId: activeId,
-                  transcript: activeTranscript,
-                },
-                // Also update in projects array
-                projects: state.projects.map((p) =>
-                  p.id === projectId
-                    ? {
-                        ...p,
-                        transcripts,
-                        activeTranscriptId: activeId,
-                        transcript: activeTranscript,
-                      }
-                    : p
-                ),
-              }));
-            }
-          });
-        }
-      },
-
-      setCurrentProject: (project) => {
-        set({ currentProject: project });
-      },
-
-      updateProject: (updates) => {
-        set((state) => {
-          if (!state.currentProject) return state;
-
-          const updatedProject = {
-            ...state.currentProject,
-            ...updates,
+        createProject: (name, audioPath, audioDuration) => {
+          const project: Project = {
+            id: generateId(),
+            name,
+            audioPath,
+            audioDuration,
+            createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
+            transcripts: [],
+            clips: [],
+            exportHistory: [],
           };
 
-          return {
-            currentProject: updatedProject,
-            projects: state.projects.map((p) => (p.id === updatedProject.id ? updatedProject : p)),
-          };
-        });
-      },
+          set((state) => ({
+            projects: [...state.projects, project],
+            currentProject: project,
+          }));
 
-      deleteProject: (projectId) => {
-        set((state) => ({
-          projects: state.projects.filter((p) => p.id !== projectId),
-          currentProject: state.currentProject?.id === projectId ? null : state.currentProject,
-        }));
+          return project;
+        },
 
-        // Clean up IndexedDB data for this project
-        clearTranscriptsFromDB(projectId);
-        clearAudioBlob(projectId);
-      },
+        loadProject: (projectId) => {
+          const project = get().projects.find((p) => p.id === projectId);
+          if (project) {
+            // Set project immediately with whatever transcripts are in memory
+            const migratedProject = {
+              ...project,
+              transcripts: project.transcripts || [],
+              activeTranscriptId: project.activeTranscriptId,
+            };
+            set({ currentProject: migratedProject });
 
-      // Legacy: sets transcript (for backward compatibility) - now adds to transcripts array
-      setTranscript: (transcript) => {
-        const state = get();
-        if (!state.currentProject) return;
+            // Load transcripts from IndexedDB (async) and update state
+            getTranscriptsFromDB(projectId).then((transcripts) => {
+              const currentProject = get().currentProject;
+              if (currentProject?.id === projectId && transcripts.length > 0) {
+                const activeId =
+                  currentProject.activeTranscriptId || transcripts[transcripts.length - 1].id;
+                const activeTranscript =
+                  transcripts.find((t) => t.id === activeId) || transcripts[transcripts.length - 1];
 
-        // Add to transcripts array and set as active
-        const transcripts = [...(state.currentProject.transcripts || [])];
+                set((state) => ({
+                  currentProject: {
+                    ...state.currentProject!,
+                    transcripts,
+                    activeTranscriptId: activeId,
+                    transcript: activeTranscript,
+                  },
+                  // Also update in projects array
+                  projects: state.projects.map((p) =>
+                    p.id === projectId
+                      ? {
+                          ...p,
+                          transcripts,
+                          activeTranscriptId: activeId,
+                          transcript: activeTranscript,
+                        }
+                      : p
+                  ),
+                }));
+              }
+            });
+          }
+        },
 
-        // Check if this transcript already exists (by ID)
-        const existingIndex = transcripts.findIndex((t) => t.id === transcript.id);
-        if (existingIndex >= 0) {
-          transcripts[existingIndex] = transcript;
-        } else {
-          transcripts.push(transcript);
-        }
+        setCurrentProject: (project) => {
+          set({ currentProject: project });
+        },
 
-        get().updateProject({
-          transcript, // Keep for backward compatibility
-          transcripts,
-          activeTranscriptId: transcript.id,
-        });
+        updateProject: (updates) => {
+          set((state) => {
+            if (!state.currentProject) return state;
 
-        // Persist to IndexedDB (async, fire-and-forget)
-        saveTranscriptsToDB(state.currentProject.id, transcripts);
-      },
+            const updatedProject = {
+              ...state.currentProject,
+              ...updates,
+              updatedAt: new Date().toISOString(),
+            };
 
-      // Add a new transcript without replacing the active one
-      addTranscript: (transcript) => {
-        const state = get();
-        if (!state.currentProject) return;
-
-        const transcripts = [...(state.currentProject.transcripts || []), transcript];
-
-        get().updateProject({
-          transcripts,
-          activeTranscriptId: transcript.id,
-          transcript, // Also set as legacy transcript
-        });
-
-        // Persist to IndexedDB (async, fire-and-forget)
-        saveTranscriptsToDB(state.currentProject.id, transcripts);
-      },
-
-      // Set which transcript is active
-      setActiveTranscript: (transcriptId) => {
-        const state = get();
-        if (!state.currentProject) return;
-
-        const transcript = state.currentProject.transcripts?.find((t) => t.id === transcriptId);
-        if (transcript) {
-          get().updateProject({
-            activeTranscriptId: transcriptId,
-            transcript, // Also set as legacy transcript
+            return {
+              currentProject: updatedProject,
+              projects: state.projects.map((p) =>
+                p.id === updatedProject.id ? updatedProject : p
+              ),
+            };
           });
-        }
-      },
+        },
 
-      // Delete a specific transcript
-      deleteTranscript: (transcriptId) => {
-        const state = get();
-        if (!state.currentProject) return;
+        deleteProject: (projectId) => {
+          set((state) => ({
+            projects: state.projects.filter((p) => p.id !== projectId),
+            currentProject: state.currentProject?.id === projectId ? null : state.currentProject,
+          }));
 
-        const transcripts = (state.currentProject.transcripts || []).filter(
-          (t) => t.id !== transcriptId
-        );
+          // Clean up IndexedDB data for this project
+          clearTranscriptsFromDB(projectId);
+          clearAudioBlob(projectId);
+        },
 
-        // If we deleted the active transcript, switch to the most recent one
-        let activeTranscriptId = state.currentProject.activeTranscriptId;
-        let transcript = state.currentProject.transcript;
+        // Legacy: sets transcript (for backward compatibility) - now adds to transcripts array
+        setTranscript: (transcript) => {
+          const state = get();
+          if (!state.currentProject) return;
 
-        if (activeTranscriptId === transcriptId) {
-          const mostRecent =
-            transcripts.length > 0 ? transcripts[transcripts.length - 1] : undefined;
-          activeTranscriptId = mostRecent?.id;
-          transcript = mostRecent;
-        }
+          // Add to transcripts array and set as active
+          const transcripts = [...(state.currentProject.transcripts || [])];
 
-        get().updateProject({
-          transcripts,
-          activeTranscriptId,
-          transcript,
-        });
-
-        // Persist to IndexedDB (async, fire-and-forget)
-        saveTranscriptsToDB(state.currentProject.id, transcripts);
-      },
-
-      // Get the currently active transcript
-      getActiveTranscript: () => {
-        const state = get();
-        if (!state.currentProject) return undefined;
-
-        // First try to find by activeTranscriptId
-        if (state.currentProject.activeTranscriptId) {
-          const active = state.currentProject.transcripts?.find(
-            (t) => t.id === state.currentProject!.activeTranscriptId
-          );
-          if (active) return active;
-        }
-
-        // Fall back to legacy transcript field
-        if (state.currentProject.transcript) {
-          return state.currentProject.transcript;
-        }
-
-        // Fall back to most recent in array
-        const transcripts = state.currentProject.transcripts || [];
-        return transcripts.length > 0 ? transcripts[transcripts.length - 1] : undefined;
-      },
-
-      // Get all transcripts for a specific audio file fingerprint
-      getTranscriptsForFingerprint: (fingerprint) => {
-        const state = get();
-        // Search across all projects for transcripts with matching fingerprint
-        const allTranscripts: Transcript[] = [];
-
-        for (const project of state.projects) {
-          const projectTranscripts = project.transcripts || [];
-          for (const t of projectTranscripts) {
-            if (t.audioFingerprint === fingerprint) {
-              allTranscripts.push(t);
-            }
-          }
-          // Also check legacy transcript
-          if (project.transcript?.audioFingerprint === fingerprint) {
-            if (!allTranscripts.find((t) => t.id === project.transcript!.id)) {
-              allTranscripts.push(project.transcript);
-            }
-          }
-        }
-
-        return allTranscripts;
-      },
-
-      updateTranscriptWord: (wordIndex, newText) => {
-        const currentState = get();
-        if (!currentState.currentProject) return;
-        const projectId = currentState.currentProject.id;
-
-        set((state) => {
-          if (!state.currentProject) return state;
-
-          // Get the active transcript
-          const activeTranscript = state.currentProject.activeTranscriptId
-            ? state.currentProject.transcripts?.find(
-                (t) => t.id === state.currentProject!.activeTranscriptId
-              )
-            : state.currentProject.transcript;
-
-          if (!activeTranscript) return state;
-
-          const newWords = [...activeTranscript.words];
-          if (newWords[wordIndex]) {
-            newWords[wordIndex] = { ...newWords[wordIndex], text: newText };
+          // Check if this transcript already exists (by ID)
+          const existingIndex = transcripts.findIndex((t) => t.id === transcript.id);
+          if (existingIndex >= 0) {
+            transcripts[existingIndex] = transcript;
+          } else {
+            transcripts.push(transcript);
           }
 
-          const updatedTranscript = {
-            ...activeTranscript,
-            words: newWords,
-            text: newWords.map((w) => w.text).join(" "),
-          };
-
-          // Update in transcripts array
-          const transcripts = (state.currentProject.transcripts || []).map((t) =>
-            t.id === updatedTranscript.id ? updatedTranscript : t
-          );
+          get().updateProject({
+            transcript, // Keep for backward compatibility
+            transcripts,
+            activeTranscriptId: transcript.id,
+          });
 
           // Persist to IndexedDB (async, fire-and-forget)
-          saveTranscriptsToDB(projectId, transcripts);
+          saveTranscriptsToDB(state.currentProject.id, transcripts);
+        },
 
-          return {
-            currentProject: {
-              ...state.currentProject,
-              transcript: updatedTranscript,
-              transcripts,
-              updatedAt: new Date().toISOString(),
-            },
-            projects: state.projects.map((p) =>
-              p.id === state.currentProject!.id
-                ? {
-                    ...p,
-                    transcript: updatedTranscript,
-                    transcripts,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : p
-            ),
-          };
-        });
-      },
+        // Add a new transcript without replacing the active one
+        addTranscript: (transcript) => {
+          const state = get();
+          if (!state.currentProject) return;
 
-      addClip: (clipData) => {
-        const clip: Clip = {
-          ...clipData,
-          id: generateId(),
-          createdAt: new Date().toISOString(),
-        };
+          const transcripts = [...(state.currentProject.transcripts || []), transcript];
 
-        set((state) => {
-          if (!state.currentProject) return state;
+          get().updateProject({
+            transcripts,
+            activeTranscriptId: transcript.id,
+            transcript, // Also set as legacy transcript
+          });
 
-          const updatedProject = {
-            ...state.currentProject,
-            clips: [...state.currentProject.clips, clip],
-            updatedAt: new Date().toISOString(),
-          };
+          // Persist to IndexedDB (async, fire-and-forget)
+          saveTranscriptsToDB(state.currentProject.id, transcripts);
+        },
 
-          return {
-            currentProject: updatedProject,
-            projects: state.projects.map((p) => (p.id === updatedProject.id ? updatedProject : p)),
-          };
-        });
+        // Set which transcript is active
+        setActiveTranscript: (transcriptId) => {
+          const state = get();
+          if (!state.currentProject) return;
 
-        return clip;
-      },
+          const transcript = state.currentProject.transcripts?.find((t) => t.id === transcriptId);
+          if (transcript) {
+            get().updateProject({
+              activeTranscriptId: transcriptId,
+              transcript, // Also set as legacy transcript
+            });
+          }
+        },
 
-      updateClip: (clipId, updates) => {
-        set((state) => {
-          if (!state.currentProject) return state;
+        // Delete a specific transcript
+        deleteTranscript: (transcriptId) => {
+          const state = get();
+          if (!state.currentProject) return;
 
-          const updatedClips = state.currentProject.clips.map((c) =>
-            c.id === clipId ? { ...c, ...updates } : c
+          const transcripts = (state.currentProject.transcripts || []).filter(
+            (t) => t.id !== transcriptId
           );
 
-          const updatedProject = {
-            ...state.currentProject,
-            clips: updatedClips,
-            updatedAt: new Date().toISOString(),
-          };
+          // If we deleted the active transcript, switch to the most recent one
+          let activeTranscriptId = state.currentProject.activeTranscriptId;
+          let transcript = state.currentProject.transcript;
 
-          return {
-            currentProject: updatedProject,
-            projects: state.projects.map((p) => (p.id === updatedProject.id ? updatedProject : p)),
-          };
-        });
-      },
+          if (activeTranscriptId === transcriptId) {
+            const mostRecent =
+              transcripts.length > 0 ? transcripts[transcripts.length - 1] : undefined;
+            activeTranscriptId = mostRecent?.id;
+            transcript = mostRecent;
+          }
 
-      removeClip: (clipId) => {
-        set((state) => {
-          if (!state.currentProject) return state;
+          get().updateProject({
+            transcripts,
+            activeTranscriptId,
+            transcript,
+          });
 
-          const updatedProject = {
-            ...state.currentProject,
-            clips: state.currentProject.clips.filter((c) => c.id !== clipId),
-            updatedAt: new Date().toISOString(),
-          };
+          // Persist to IndexedDB (async, fire-and-forget)
+          saveTranscriptsToDB(state.currentProject.id, transcripts);
+        },
 
-          return {
-            currentProject: updatedProject,
-            projects: state.projects.map((p) => (p.id === updatedProject.id ? updatedProject : p)),
-          };
-        });
-      },
+        // Get the currently active transcript
+        getActiveTranscript: () => {
+          const state = get();
+          if (!state.currentProject) return undefined;
 
-      addRenderJob: (clipId, format, templateId) => {
-        const job: RenderJob = {
-          id: generateId(),
-          clipId,
-          format,
-          templateId,
-          status: "queued",
-          progress: 0,
-          createdAt: new Date().toISOString(),
-        };
+          // First try to find by activeTranscriptId
+          if (state.currentProject.activeTranscriptId) {
+            const active = state.currentProject.transcripts?.find(
+              (t) => t.id === state.currentProject!.activeTranscriptId
+            );
+            if (active) return active;
+          }
 
-        set((state) => ({
-          renderQueue: [...state.renderQueue, job],
-        }));
+          // Fall back to legacy transcript field
+          if (state.currentProject.transcript) {
+            return state.currentProject.transcript;
+          }
 
-        return job;
-      },
+          // Fall back to most recent in array
+          const transcripts = state.currentProject.transcripts || [];
+          return transcripts.length > 0 ? transcripts[transcripts.length - 1] : undefined;
+        },
 
-      updateRenderJob: (jobId, updates) => {
-        set((state) => ({
-          renderQueue: state.renderQueue.map((job) =>
-            job.id === jobId ? { ...job, ...updates } : job
-          ),
-        }));
-      },
+        // Get all transcripts for a specific audio file fingerprint
+        getTranscriptsForFingerprint: (fingerprint) => {
+          const state = get();
+          // Search across all projects for transcripts with matching fingerprint
+          const allTranscripts: Transcript[] = [];
 
-      removeRenderJob: (jobId) => {
-        set((state) => ({
-          renderQueue: state.renderQueue.filter((job) => job.id !== jobId),
-        }));
-      },
+          for (const project of state.projects) {
+            const projectTranscripts = project.transcripts || [];
+            for (const t of projectTranscripts) {
+              if (t.audioFingerprint === fingerprint) {
+                allTranscripts.push(t);
+              }
+            }
+            // Also check legacy transcript
+            if (project.transcript?.audioFingerprint === fingerprint) {
+              if (!allTranscripts.find((t) => t.id === project.transcript!.id)) {
+                allTranscripts.push(project.transcript);
+              }
+            }
+          }
 
-      clearCompletedJobs: () => {
-        set((state) => ({
-          renderQueue: state.renderQueue.filter(
-            (job) => job.status !== "completed" && job.status !== "failed"
-          ),
-        }));
-      },
+          return allTranscripts;
+        },
 
-      addExportRecord: (record) => {
-        set((state) => {
-          if (!state.currentProject) return state;
+        updateTranscriptWord: (wordIndex, newText) => {
+          const currentState = get();
+          if (!currentState.currentProject) return;
+          const projectId = currentState.currentProject.id;
 
-          const exportRecord: ExportRecord = {
-            ...record,
+          set((state) => {
+            if (!state.currentProject) return state;
+
+            // Get the active transcript
+            const activeTranscript = state.currentProject.activeTranscriptId
+              ? state.currentProject.transcripts?.find(
+                  (t) => t.id === state.currentProject!.activeTranscriptId
+                )
+              : state.currentProject.transcript;
+
+            if (!activeTranscript) return state;
+
+            const newWords = [...activeTranscript.words];
+            if (newWords[wordIndex]) {
+              newWords[wordIndex] = { ...newWords[wordIndex], text: newText };
+            }
+
+            const updatedTranscript = {
+              ...activeTranscript,
+              words: newWords,
+              text: newWords.map((w) => w.text).join(" "),
+            };
+
+            // Update in transcripts array
+            const transcripts = (state.currentProject.transcripts || []).map((t) =>
+              t.id === updatedTranscript.id ? updatedTranscript : t
+            );
+
+            // Persist to IndexedDB (async, fire-and-forget)
+            saveTranscriptsToDB(projectId, transcripts);
+
+            return {
+              currentProject: {
+                ...state.currentProject,
+                transcript: updatedTranscript,
+                transcripts,
+                updatedAt: new Date().toISOString(),
+              },
+              projects: state.projects.map((p) =>
+                p.id === state.currentProject!.id
+                  ? {
+                      ...p,
+                      transcript: updatedTranscript,
+                      transcripts,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : p
+              ),
+            };
+          });
+        },
+
+        addClip: (clipData) => {
+          const clip: Clip = {
+            ...clipData,
             id: generateId(),
-            exportedAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
           };
 
-          const updatedProject = {
-            ...state.currentProject,
-            exportHistory: [...state.currentProject.exportHistory, exportRecord],
-            updatedAt: new Date().toISOString(),
+          set((state) => {
+            if (!state.currentProject) return state;
+
+            const updatedProject = {
+              ...state.currentProject,
+              clips: [...state.currentProject.clips, clip],
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              currentProject: updatedProject,
+              projects: state.projects.map((p) =>
+                p.id === updatedProject.id ? updatedProject : p
+              ),
+            };
+          });
+
+          return clip;
+        },
+
+        updateClip: (clipId, updates) => {
+          set((state) => {
+            if (!state.currentProject) return state;
+
+            const updatedClips = state.currentProject.clips.map((c) =>
+              c.id === clipId ? { ...c, ...updates } : c
+            );
+
+            const updatedProject = {
+              ...state.currentProject,
+              clips: updatedClips,
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              currentProject: updatedProject,
+              projects: state.projects.map((p) =>
+                p.id === updatedProject.id ? updatedProject : p
+              ),
+            };
+          });
+        },
+
+        removeClip: (clipId) => {
+          set((state) => {
+            if (!state.currentProject) return state;
+
+            const updatedProject = {
+              ...state.currentProject,
+              clips: state.currentProject.clips.filter((c) => c.id !== clipId),
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              currentProject: updatedProject,
+              projects: state.projects.map((p) =>
+                p.id === updatedProject.id ? updatedProject : p
+              ),
+            };
+          });
+        },
+
+        addRenderJob: (clipId, format, templateId) => {
+          const job: RenderJob = {
+            id: generateId(),
+            clipId,
+            format,
+            templateId,
+            status: "queued",
+            progress: 0,
+            createdAt: new Date().toISOString(),
           };
 
-          return {
-            currentProject: updatedProject,
-            projects: state.projects.map((p) => (p.id === updatedProject.id ? updatedProject : p)),
-          };
-        });
-      },
-    }),
+          set((state) => ({
+            renderQueue: [...state.renderQueue, job],
+          }));
+
+          return job;
+        },
+
+        updateRenderJob: (jobId, updates) => {
+          set((state) => ({
+            renderQueue: state.renderQueue.map((job) =>
+              job.id === jobId ? { ...job, ...updates } : job
+            ),
+          }));
+        },
+
+        removeRenderJob: (jobId) => {
+          set((state) => ({
+            renderQueue: state.renderQueue.filter((job) => job.id !== jobId),
+          }));
+        },
+
+        clearCompletedJobs: () => {
+          set((state) => ({
+            renderQueue: state.renderQueue.filter(
+              (job) => job.status !== "completed" && job.status !== "failed"
+            ),
+          }));
+        },
+
+        addExportRecord: (record) => {
+          set((state) => {
+            if (!state.currentProject) return state;
+
+            const exportRecord: ExportRecord = {
+              ...record,
+              id: generateId(),
+              exportedAt: new Date().toISOString(),
+            };
+
+            const updatedProject = {
+              ...state.currentProject,
+              exportHistory: [...state.currentProject.exportHistory, exportRecord],
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              currentProject: updatedProject,
+              projects: state.projects.map((p) =>
+                p.id === updatedProject.id ? updatedProject : p
+              ),
+            };
+          });
+        },
+      };
+    },
     {
       name: "podcastomatic-projects",
       version: 4,
@@ -937,7 +960,9 @@ export const useProjectStore = create<ProjectState>()(
           }
 
           // Update the store with transcripts loaded from IndexedDB
-          useProjectStore.setState({ projects: updatedProjects });
+          if (projectStoreSetState) {
+            projectStoreSetState({ projects: updatedProjects });
+          }
         };
       },
     }

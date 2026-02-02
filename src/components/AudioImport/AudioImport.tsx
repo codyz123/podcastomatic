@@ -13,6 +13,8 @@ import { Progress } from "../ui/Progress";
 import { useProjectStore, setAudioBlob, clearAudioBlob } from "../../stores/projectStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useEpisodes } from "../../hooks/useEpisodes";
+import { useChunkedUpload } from "../../hooks/useChunkedUpload";
+import { useAuthStore } from "../../stores/authStore";
 import { formatDuration } from "../../lib/formats";
 import { cn, generateFileFingerprint } from "../../lib/utils";
 import WaveSurfer from "wavesurfer.js";
@@ -26,10 +28,37 @@ interface AudioImportProps {
   onComplete: () => void;
 }
 
+// Threshold for switching to chunked upload (100MB)
+const CHUNKED_UPLOAD_THRESHOLD = 100 * 1024 * 1024;
+
+// Format bytes to human readable
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
+
+// Format ETA in seconds to human readable
+function formatETA(seconds: number): string {
+  if (!seconds || !isFinite(seconds)) return "calculating...";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+}
+
 export const AudioImport: React.FC<AudioImportProps> = ({ onComplete }) => {
   const { currentProject, updateProject, getTranscriptsForFingerprint } = useProjectStore();
   const { settings } = useSettingsStore();
   const { uploadAudio } = useEpisodes();
+  const { currentPodcastId } = useAuthStore();
+  const {
+    upload: chunkedUpload,
+    cancel: cancelChunkedUpload,
+    progress: chunkedProgress,
+    isUploading: isChunkedUploading,
+  } = useChunkedUpload(currentPodcastId, currentProject?.id ?? null);
   const [existingTranscriptsCount, setExistingTranscriptsCount] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -402,26 +431,53 @@ export const AudioImport: React.FC<AudioImportProps> = ({ onComplete }) => {
       updateProject(updates);
 
       // Upload audio to backend (async, don't block UI)
+      // Use chunked upload for large files (> 100MB), regular upload for smaller files
       if (currentProject?.id) {
         setIsUploading(true);
-        uploadAudio(currentProject.id, file, audioDuration)
-          .then((updatedEpisode) => {
-            if (updatedEpisode?.audioBlobUrl) {
-              // Update local state with the backend URL and duration from server
-              updateProject({
-                audioPath: updatedEpisode.audioBlobUrl,
-                audioDuration: updatedEpisode.audioDuration || audioDuration,
-              });
-              console.log("[AudioImport] Uploaded to backend:", updatedEpisode.audioBlobUrl);
-            }
-          })
-          .catch((err) => {
-            console.error("[AudioImport] Backend upload failed:", err);
-            // Keep local blob URL as fallback
-          })
-          .finally(() => {
-            setIsUploading(false);
-          });
+
+        if (file.size > CHUNKED_UPLOAD_THRESHOLD) {
+          // Use chunked upload for large files
+          console.log(
+            `[AudioImport] Using chunked upload for large file (${formatBytes(file.size)})`
+          );
+          chunkedUpload(file)
+            .then((result) => {
+              if (result?.url) {
+                updateProject({
+                  audioPath: result.url,
+                  audioDuration: audioDuration,
+                });
+                console.log("[AudioImport] Chunked upload complete:", result.url);
+              }
+            })
+            .catch((err) => {
+              console.error("[AudioImport] Chunked upload failed:", err);
+              // Keep local blob URL as fallback
+            })
+            .finally(() => {
+              setIsUploading(false);
+            });
+        } else {
+          // Use regular upload for smaller files
+          uploadAudio(currentProject.id, file, audioDuration)
+            .then((updatedEpisode) => {
+              if (updatedEpisode?.audioBlobUrl) {
+                // Update local state with the backend URL and duration from server
+                updateProject({
+                  audioPath: updatedEpisode.audioBlobUrl,
+                  audioDuration: updatedEpisode.audioDuration || audioDuration,
+                });
+                console.log("[AudioImport] Uploaded to backend:", updatedEpisode.audioBlobUrl);
+              }
+            })
+            .catch((err) => {
+              console.error("[AudioImport] Backend upload failed:", err);
+              // Keep local blob URL as fallback
+            })
+            .finally(() => {
+              setIsUploading(false);
+            });
+        }
       }
 
       // Try to load WaveSurfer for waveform visualization
@@ -517,16 +573,6 @@ export const AudioImport: React.FC<AudioImportProps> = ({ onComplete }) => {
       <div className="mx-auto max-w-2xl">
         {/* Header */}
         <div className="mb-8 sm:mb-10">
-          <div
-            className={cn(
-              "mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1",
-              "bg-[hsl(var(--surface))]",
-              "border border-[hsl(var(--glass-border))]"
-            )}
-          >
-            <span className="text-xs font-semibold text-[hsl(var(--cyan))]">1</span>
-            <span className="text-xs font-medium text-[hsl(var(--text-subtle))]">Step 1 of 5</span>
-          </div>
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[hsl(var(--text))] sm:text-3xl">
             Import Audio
           </h1>
@@ -643,6 +689,75 @@ export const AudioImport: React.FC<AudioImportProps> = ({ onComplete }) => {
               </Card>
             )}
 
+            {/* Chunked Upload Progress */}
+            {isChunkedUploading && chunkedProgress && (
+              <Card variant="default" className="animate-fadeInUp mt-5">
+                <CardContent className="p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={cn(
+                          "flex h-10 w-10 items-center justify-center rounded-lg",
+                          "bg-[hsl(185_50%_15%/0.5)]"
+                        )}
+                      >
+                        <UploadIcon className="h-4 w-4 animate-pulse text-[hsl(var(--cyan))]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-[hsl(var(--text))]">
+                          {chunkedProgress.status === "checking" &&
+                            "Checking for resumable upload..."}
+                          {chunkedProgress.status === "initializing" && "Initializing upload..."}
+                          {chunkedProgress.status === "uploading" &&
+                            `Uploading... ${chunkedProgress.percentage}%`}
+                          {chunkedProgress.status === "completing" && "Finalizing upload..."}
+                        </p>
+                        <p className="text-xs text-[hsl(var(--text-muted))]">
+                          {formatBytes(chunkedProgress.uploadedBytes)} of{" "}
+                          {formatBytes(chunkedProgress.totalBytes)}
+                          {chunkedProgress.speed > 0 && (
+                            <span className="ml-2">• {formatBytes(chunkedProgress.speed)}/s</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={cancelChunkedUpload}
+                      className="text-[hsl(var(--text-subtle))] hover:text-[hsl(var(--error))]"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <Progress value={chunkedProgress.percentage} variant="cyan" size="md" />
+                  <div className="mt-2 flex justify-between text-xs text-[hsl(var(--text-ghost))]">
+                    <span>
+                      Part {chunkedProgress.completedParts} of {chunkedProgress.totalParts}
+                    </span>
+                    {chunkedProgress.eta > 0 && (
+                      <span>{formatETA(chunkedProgress.eta)} remaining</span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Chunked Upload Error */}
+            {chunkedProgress?.status === "error" && chunkedProgress.error && (
+              <div
+                className={cn(
+                  "animate-fadeInUp mt-5 rounded-xl p-4 text-center",
+                  "bg-[hsl(0_50%_15%/0.4)]",
+                  "border border-[hsl(var(--error)/0.2)]"
+                )}
+              >
+                <p className="text-sm font-medium text-[hsl(var(--error))]">
+                  Upload failed: {chunkedProgress.error}
+                </p>
+              </div>
+            )}
+
             {/* Error */}
             {error && (
               <div
@@ -678,7 +793,7 @@ export const AudioImport: React.FC<AudioImportProps> = ({ onComplete }) => {
                   </p>
                   <p className="mt-0.5 text-xs text-[hsl(var(--text-muted))]">
                     {currentProject?.name}
-                    {isUploading && (
+                    {isUploading && !isChunkedUploading && (
                       <span className="ml-2 text-[hsl(var(--cyan))]">• Syncing to cloud...</span>
                     )}
                   </p>
@@ -693,6 +808,57 @@ export const AudioImport: React.FC<AudioImportProps> = ({ onComplete }) => {
                   Remove
                 </Button>
               </div>
+
+              {/* Chunked Upload Progress (shown in audio preview section) */}
+              {isChunkedUploading && chunkedProgress && (
+                <div
+                  className={cn(
+                    "mb-5 rounded-lg p-4",
+                    "bg-[hsl(185_50%_10%/0.3)]",
+                    "border border-[hsl(var(--cyan)/0.2)]"
+                  )}
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <UploadIcon className="h-4 w-4 animate-pulse text-[hsl(var(--cyan))]" />
+                      <div>
+                        <p className="text-sm font-medium text-[hsl(var(--text))]">
+                          {chunkedProgress.status === "checking" &&
+                            "Checking for resumable upload..."}
+                          {chunkedProgress.status === "initializing" && "Initializing upload..."}
+                          {chunkedProgress.status === "uploading" &&
+                            `Uploading to cloud... ${chunkedProgress.percentage}%`}
+                          {chunkedProgress.status === "completing" && "Finalizing upload..."}
+                        </p>
+                        <p className="text-xs text-[hsl(var(--text-muted))]">
+                          {formatBytes(chunkedProgress.uploadedBytes)} of{" "}
+                          {formatBytes(chunkedProgress.totalBytes)}
+                          {chunkedProgress.speed > 0 && (
+                            <span className="ml-2">• {formatBytes(chunkedProgress.speed)}/s</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={cancelChunkedUpload}
+                      className="text-[hsl(var(--text-subtle))] hover:text-[hsl(var(--error))]"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                  <Progress value={chunkedProgress.percentage} variant="cyan" size="sm" />
+                  <div className="mt-2 flex justify-between text-xs text-[hsl(var(--text-ghost))]">
+                    <span>
+                      Part {chunkedProgress.completedParts} of {chunkedProgress.totalParts}
+                    </span>
+                    {chunkedProgress.eta > 0 && (
+                      <span>{formatETA(chunkedProgress.eta)} remaining</span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Existing transcripts notice */}
               {existingTranscriptsCount > 0 && (

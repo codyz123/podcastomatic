@@ -11,9 +11,11 @@ import { Button, Card, CardContent, Input } from "../ui";
 import { Progress, Spinner } from "../ui/Progress";
 import { useProjectStore, getAudioBlob } from "../../stores/projectStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useAuthStore } from "../../stores/authStore";
 import { useEpisodes } from "../../hooks/useEpisodes";
 import { ClippabilityScore, Word } from "../../lib/types";
 import { retryWithBackoff, cn } from "../../lib/utils";
+import { authFetch } from "../../lib/api";
 import { ClipEditor } from "./ClipEditor";
 import { ClipStackItem } from "./ClipStackItem";
 
@@ -24,6 +26,7 @@ interface ClipSelectorProps {
 export const ClipSelector: React.FC<ClipSelectorProps> = ({ onComplete }) => {
   const { currentProject, addClip, removeClip, updateClip } = useProjectStore();
   const { settings } = useSettingsStore();
+  const accessToken = useAuthStore((state) => state.accessToken);
   const { saveClips } = useEpisodes();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -309,7 +312,7 @@ export const ClipSelector: React.FC<ClipSelectorProps> = ({ onComplete }) => {
   );
 
   // Check if backend is configured
-  const useBackend = !!(settings.backendUrl && settings.accessCode);
+  const useBackend = !!settings.backendUrl;
 
   const analyzeClippability = async () => {
     if (!transcript) {
@@ -319,8 +322,12 @@ export const ClipSelector: React.FC<ClipSelectorProps> = ({ onComplete }) => {
 
     // Check auth requirements
     if (useBackend) {
-      if (!settings.backendUrl || !settings.accessCode) {
-        setError("Please configure backend URL and access code in Settings");
+      if (!settings.backendUrl) {
+        setError("Please configure the backend URL in Settings");
+        return;
+      }
+      if (!settings.accessCode && !accessToken) {
+        setError("Please sign in or set an access code in Settings to use the backend.");
         return;
       }
     } else {
@@ -341,12 +348,19 @@ export const ClipSelector: React.FC<ClipSelectorProps> = ({ onComplete }) => {
         // Use backend endpoint
         setProgress(30);
 
-        const response = await fetch(`${settings.backendUrl}/api/analyze-clips`, {
+        const headers = new Headers({
+          "Content-Type": "application/json",
+        });
+        if (settings.accessCode) {
+          headers.set("X-Access-Code", settings.accessCode);
+        }
+        if (settings.openaiApiKey) {
+          headers.set("X-OpenAI-Key", settings.openaiApiKey);
+        }
+
+        const response = await authFetch(`${settings.backendUrl}/api/analyze-clips`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Access-Code": settings.accessCode!,
-          },
+          headers,
           body: JSON.stringify({
             transcript: {
               words: transcript.words.map((w) => ({
@@ -573,18 +587,6 @@ Return ONLY valid JSON in this exact format (no other text):
         <div className="mx-auto max-w-4xl">
           {/* Header */}
           <div className="mb-8">
-            <div
-              className={cn(
-                "mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1",
-                "bg-[hsl(var(--surface))]",
-                "border border-[hsl(var(--glass-border))]"
-              )}
-            >
-              <span className="text-xs font-semibold text-[hsl(var(--cyan))]">3</span>
-              <span className="text-xs font-medium text-[hsl(var(--text-subtle))]">
-                Step 3 of 5
-              </span>
-            </div>
             <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[hsl(var(--text))] sm:text-3xl">
               Select Clips
             </h1>
@@ -1040,7 +1042,7 @@ Return ONLY valid JSON in this exact format (no other text):
         </div>
 
         <Button onClick={onComplete} disabled={clips.length === 0} glow={clips.length > 0}>
-          Continue to Preview
+          Continue to Editor
           <ChevronRightIcon className="h-4 w-4" />
         </Button>
       </div>

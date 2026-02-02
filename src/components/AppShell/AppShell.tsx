@@ -76,8 +76,8 @@ const postProductionSubStages: SubStageOption[] = [
 const marketingSubStages: SubStageOption[] = [
   { id: "clips", label: "Clips", icon: ScissorsIcon },
   { id: "editor", label: "Editor", icon: VideoIcon },
-  { id: "export", label: "Publish", icon: DownloadIcon },
   { id: "text-content", label: "Text Content", icon: FileTextIcon },
+  { id: "export", label: "Publish", icon: DownloadIcon },
 ];
 
 // Get sub-stages for a given stage

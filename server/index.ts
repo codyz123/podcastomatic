@@ -10,6 +10,7 @@ import { podcastsRouter } from "./routes/podcasts.js";
 import { episodesRouter } from "./routes/episodes.js";
 import { textSnippetsRouter } from "./routes/text-snippets.js";
 import { generateSnippetRouter } from "./routes/generate-snippet.js";
+import { uploadsRouter } from "./routes/uploads.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { initializeDatabase } from "./lib/token-storage.js";
 import { initializeMediaTables } from "./lib/media-storage.js";
@@ -20,6 +21,17 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
+
+// Raw body parser for multipart chunk uploads (must come BEFORE express.json)
+// Matches: /api/podcasts/:podcastId/episodes/:episodeId/uploads/:sessionId/part/:partNumber
+app.use(
+  /^\/api\/podcasts\/[^/]+\/episodes\/[^/]+\/uploads\/[^/]+\/part\/\d+$/,
+  express.raw({
+    type: "application/octet-stream",
+    limit: "100mb", // Max chunk size
+  })
+);
+
 app.use(express.json({ limit: "10mb" })); // Increased for large transcripts
 
 // Health check (no auth required)
@@ -41,6 +53,9 @@ app.use("/api/podcasts", podcastsRouter);
 // Episodes routes - scoped to podcast (JWT auth handled internally)
 app.use("/api/podcasts", episodesRouter);
 
+// Multipart upload routes for large files (JWT auth handled internally)
+app.use("/api/podcasts", uploadsRouter);
+
 // Text snippets routes - scoped to podcast (JWT auth handled internally)
 app.use("/api/podcasts", textSnippetsRouter);
 
@@ -60,7 +75,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === "LIMIT_FILE_SIZE") {
       res.status(413).json({
-        error: "File too large. Maximum size is 50MB. Try a shorter audio clip.",
+        error: "File too large. Maximum size is 5GB. Try a shorter audio clip.",
       });
       return;
     }
@@ -70,7 +85,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 
   if (err.message?.includes("File too large")) {
     res.status(413).json({
-      error: "File too large. Maximum size is 50MB. Try a shorter audio clip.",
+      error: "File too large. Maximum size is 5GB. Try a shorter audio clip.",
     });
     return;
   }

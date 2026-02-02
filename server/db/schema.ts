@@ -163,6 +163,59 @@ export const projects = pgTable(
   (table) => [index("projects_v2_podcast_id_idx").on(table.podcastId)]
 );
 
+// ============ Upload Sessions (Multipart) ============
+
+export const uploadSessions = pgTable(
+  "upload_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    podcastId: uuid("podcast_id")
+      .references(() => podcasts.id, { onDelete: "cascade" })
+      .notNull(),
+    episodeId: uuid("episode_id")
+      .references(() => projects.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // Vercel Blob multipart identifiers (required for uploadPart/complete)
+    uploadId: varchar("upload_id", { length: 255 }).notNull(),
+    blobKey: varchar("blob_key", { length: 255 }).notNull(),
+    pathname: varchar("pathname", { length: 500 }).notNull(),
+
+    // File metadata
+    filename: varchar("filename", { length: 255 }).notNull(),
+    contentType: varchar("content_type", { length: 100 }).notNull(),
+    totalBytes: bigint("total_bytes", { mode: "number" }).notNull(),
+    chunkSize: integer("chunk_size").notNull(),
+    totalParts: integer("total_parts").notNull(),
+
+    // Progress tracking
+    completedParts: jsonb("completed_parts")
+      .$type<Array<{ partNumber: number; etag: string }>>()
+      .default([]),
+    uploadedBytes: bigint("uploaded_bytes", { mode: "number" }).default(0),
+
+    // Status: 'pending' | 'uploading' | 'completing' | 'completed' | 'failed' | 'expired'
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+    errorMessage: text("error_message"),
+    blobUrl: text("blob_url"), // Set after completion
+
+    // Timestamps
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+
+    // User tracking
+    createdById: uuid("created_by_id")
+      .references(() => users.id)
+      .notNull(),
+  },
+  (table) => [
+    index("upload_sessions_episode_id_idx").on(table.episodeId),
+    index("upload_sessions_status_idx").on(table.status),
+    index("upload_sessions_expires_at_idx").on(table.expiresAt),
+  ]
+);
+
 // ============ Transcripts ============
 
 export const transcripts = pgTable(
@@ -384,6 +437,22 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   clips: many(clips),
   mediaAssets: many(mediaAssets),
   textSnippets: many(textSnippets),
+  uploadSessions: many(uploadSessions),
+}));
+
+export const uploadSessionsRelations = relations(uploadSessions, ({ one }) => ({
+  podcast: one(podcasts, {
+    fields: [uploadSessions.podcastId],
+    references: [podcasts.id],
+  }),
+  episode: one(projects, {
+    fields: [uploadSessions.episodeId],
+    references: [projects.id],
+  }),
+  createdBy: one(users, {
+    fields: [uploadSessions.createdById],
+    references: [users.id],
+  }),
 }));
 
 export const transcriptsRelations = relations(transcripts, ({ one }) => ({
@@ -472,3 +541,5 @@ export type RenderedClip = typeof renderedClips.$inferSelect;
 export type NewRenderedClip = typeof renderedClips.$inferInsert;
 export type OAuthToken = typeof oauthTokens.$inferSelect;
 export type NewOAuthToken = typeof oauthTokens.$inferInsert;
+export type UploadSession = typeof uploadSessions.$inferSelect;
+export type NewUploadSession = typeof uploadSessions.$inferInsert;

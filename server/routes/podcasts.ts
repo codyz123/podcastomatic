@@ -4,7 +4,7 @@ import { db, podcasts, podcastMembers, podcastInvitations, users } from "../db/i
 import { eq, and, gt } from "drizzle-orm";
 import { jwtAuthMiddleware } from "../middleware/auth.js";
 import { generateInvitationToken } from "../services/authService.js";
-import { sendInvitationEmail } from "../services/emailService.js";
+import { sendInvitationEmail, getEmailConfigStatus } from "../services/emailService.js";
 import { uploadMedia } from "../lib/media-storage.js";
 
 export const podcastsRouter = Router();
@@ -373,8 +373,11 @@ podcastsRouter.post("/:id/invite", async (req: Request, res: Response) => {
         status: "invited",
         message: emailResult.success
           ? "Invitation sent! They'll receive an email."
-          : "Invitation created. User will be added when they register.",
+          : "Invitation created, but the email could not be sent.",
         emailSent: emailResult.success,
+        emailError: emailResult.error,
+        emailErrorCode: emailResult.errorCode,
+        invitationUrl: emailResult.invitationUrl,
       });
     }
   } catch (error) {
@@ -382,6 +385,112 @@ podcastsRouter.post("/:id/invite", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Failed to invite user" });
   }
 });
+
+// GET /api/podcasts/:id/email-config - Get email configuration status (for diagnostics)
+podcastsRouter.get("/:id/email-config", async (req: Request, res: Response) => {
+  try {
+    const id = getParam(req.params.id);
+
+    // Check membership
+    const [membership] = await db
+      .select()
+      .from(podcastMembers)
+      .where(and(eq(podcastMembers.podcastId, id), eq(podcastMembers.userId, req.user!.userId)));
+
+    if (!membership) {
+      res.status(403).json({ error: "Not a member of this podcast" });
+      return;
+    }
+
+    // Only owners can see detailed config
+    if (membership.role !== "owner") {
+      res.status(403).json({ error: "Only owner can view email configuration" });
+      return;
+    }
+
+    const status = getEmailConfigStatus();
+    res.json({ emailConfig: status });
+  } catch (error) {
+    console.error("Get email config error:", error);
+    res.status(500).json({ error: "Failed to get email config" });
+  }
+});
+
+// POST /api/podcasts/:id/invitations/:invitationId/resend - Resend invitation email
+podcastsRouter.post(
+  "/:id/invitations/:invitationId/resend",
+  async (req: Request, res: Response) => {
+    try {
+      const id = getParam(req.params.id);
+      const invitationId = getParam(req.params.invitationId);
+      console.log("[Resend Invitation] podcastId:", id, "invitationId:", invitationId);
+
+      // Check membership and get podcast info
+      const [membershipWithPodcast] = await db
+        .select({
+          membership: podcastMembers,
+          podcastName: podcasts.name,
+        })
+        .from(podcastMembers)
+        .innerJoin(podcasts, eq(podcasts.id, podcastMembers.podcastId))
+        .where(and(eq(podcastMembers.podcastId, id), eq(podcastMembers.userId, req.user!.userId)));
+
+      if (!membershipWithPodcast) {
+        res.status(403).json({ error: "Not a member of this podcast" });
+        return;
+      }
+
+      // Get the invitation
+      const [invitation] = await db
+        .select()
+        .from(podcastInvitations)
+        .where(
+          and(
+            eq(podcastInvitations.id, invitationId),
+            eq(podcastInvitations.podcastId, id),
+            gt(podcastInvitations.expiresAt, new Date())
+          )
+        );
+
+      if (!invitation) {
+        res.status(404).json({ error: "Invitation not found or expired" });
+        return;
+      }
+
+      // Get inviter's name (use current user as the resender)
+      const [inviter] = await db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, req.user!.userId));
+
+      const inviterName = inviter?.name || "A team member";
+      const podcastName = membershipWithPodcast.podcastName;
+
+      // Send the invitation email
+      console.log(`[Resend Invitation] Sending email to ${invitation.email}`);
+      const emailResult = await sendInvitationEmail({
+        to: invitation.email,
+        inviterName,
+        podcastName,
+        invitationToken: invitation.token,
+      });
+
+      res.json({
+        success: emailResult.success,
+        emailSent: emailResult.success,
+        emailError: emailResult.error,
+        errorCode: emailResult.errorCode,
+        invitationUrl: emailResult.invitationUrl,
+        message: emailResult.success
+          ? "Invitation email sent!"
+          : `Email could not be sent: ${emailResult.error}`,
+      });
+    } catch (error) {
+      console.error("Resend invitation error:", error);
+      res.status(500).json({ error: "Failed to resend invitation" });
+    }
+  }
+);
 
 // DELETE /api/podcasts/:id/invitations/:invitationId - Cancel invitation
 podcastsRouter.delete("/:id/invitations/:invitationId", async (req: Request, res: Response) => {

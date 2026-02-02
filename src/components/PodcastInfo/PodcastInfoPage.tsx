@@ -9,6 +9,8 @@ import {
   Cross2Icon,
   CheckIcon,
   TrashIcon,
+  ReloadIcon,
+  CopyIcon,
 } from "@radix-ui/react-icons";
 import { cn, debounce } from "../../lib/utils";
 import { useWorkspaceStore, PodcastMetadata } from "../../stores/workspaceStore";
@@ -70,6 +72,7 @@ export const PodcastInfoPage: React.FC = () => {
     inviteMember,
     removeMember,
     cancelInvitation,
+    resendInvitation,
     isOwner,
     updatePodcast,
     deletePodcast,
@@ -79,8 +82,16 @@ export const PodcastInfoPage: React.FC = () => {
   const [isInviting, setIsInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [cancellingInviteId, setCancellingInviteId] = useState<string | null>(null);
+  const [resendingInviteId, setResendingInviteId] = useState<string | null>(null);
+  const [resendResult, setResendResult] = useState<{
+    invitationId: string;
+    success: boolean;
+    message: string;
+    invitationUrl?: string;
+  } | null>(null);
 
   // Danger zone state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -256,15 +267,24 @@ export const PodcastInfoPage: React.FC = () => {
     setIsInviting(true);
     setInviteError(null);
     setInviteSuccess(null);
+    setInviteLink(null);
 
     try {
       const result = await inviteMember(inviteEmail.trim());
       setInviteEmail("");
-      setInviteSuccess(
-        result.status === "added"
-          ? "User added to team!"
-          : "Invitation sent! They'll be added when they sign up."
-      );
+      if (result.status === "added") {
+        setInviteSuccess("User added to team!");
+      } else if (result.emailSent) {
+        setInviteSuccess("Invitation sent! They'll receive an email.");
+      } else {
+        setInviteSuccess(result.message || "Invitation created, but email could not be sent.");
+        if (result.emailError) {
+          setInviteError(result.emailError);
+        }
+        if (result.invitationUrl) {
+          setInviteLink(result.invitationUrl);
+        }
+      }
       setTimeout(() => setInviteSuccess(null), 5000);
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : "Failed to invite");
@@ -293,6 +313,37 @@ export const PodcastInfoPage: React.FC = () => {
     } finally {
       setCancellingInviteId(null);
     }
+  };
+
+  const handleResendInvitation = async (invitationId: string) => {
+    setResendingInviteId(invitationId);
+    setResendResult(null);
+    try {
+      const result = await resendInvitation(invitationId);
+      setResendResult({
+        invitationId,
+        success: result.success,
+        message: result.message || (result.success ? "Email sent!" : "Failed to send email"),
+        invitationUrl: result.invitationUrl,
+      });
+      // Auto-clear success message after 5 seconds
+      if (result.success) {
+        setTimeout(() => setResendResult(null), 5000);
+      }
+    } catch (err) {
+      setResendResult({
+        invitationId,
+        success: false,
+        message: err instanceof Error ? err.message : "Failed to resend invitation",
+      });
+    } finally {
+      setResendingInviteId(null);
+    }
+  };
+
+  const handleCopyInviteLink = (url: string) => {
+    navigator.clipboard.writeText(url);
+    // Brief feedback could be added here
   };
 
   return (
@@ -686,6 +737,24 @@ export const PodcastInfoPage: React.FC = () => {
                     {inviteSuccess}
                   </p>
                 )}
+                {inviteLink && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-[hsl(var(--text-muted))]">
+                    <span className="truncate">Invite link ready</span>
+                    <button
+                      type="button"
+                      onClick={() => navigator.clipboard.writeText(inviteLink)}
+                      className={cn(
+                        "rounded-full px-2.5 py-1",
+                        "bg-[hsl(var(--surface))]",
+                        "border border-[hsl(var(--border-subtle))]",
+                        "text-[hsl(var(--text))]",
+                        "hover:bg-[hsl(var(--surface-hover))]"
+                      )}
+                    >
+                      Copy invite link
+                    </button>
+                  </div>
+                )}
               </form>
 
               {/* Current Members */}
@@ -786,38 +855,91 @@ export const PodcastInfoPage: React.FC = () => {
                   </h3>
                   <div className="space-y-2">
                     {podcast.pendingInvitations.map((invitation) => (
-                      <div
-                        key={invitation.id}
-                        className={cn(
-                          "flex items-center justify-between rounded-lg px-4 py-3",
-                          "bg-[hsl(var(--bg-base))]",
-                          "border border-dashed border-[hsl(var(--border-subtle))]"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--surface))] text-[hsl(var(--text-ghost))]">
-                            <EnvelopeClosedIcon className="h-4 w-4" />
+                      <div key={invitation.id} className="space-y-2">
+                        <div
+                          className={cn(
+                            "flex items-center justify-between rounded-lg px-4 py-3",
+                            "bg-[hsl(var(--bg-base))]",
+                            "border border-dashed border-[hsl(var(--border-subtle))]"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--surface))] text-[hsl(var(--text-ghost))]">
+                              <EnvelopeClosedIcon className="h-4 w-4" />
+                            </div>
+                            <div>
+                              <p className="text-sm text-[hsl(var(--text))]">{invitation.email}</p>
+                              <p className="text-xs text-[hsl(var(--text-ghost))]">
+                                Invited {new Date(invitation.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm text-[hsl(var(--text))]">{invitation.email}</p>
-                            <p className="text-xs text-[hsl(var(--text-ghost))]">
-                              Invited {new Date(invitation.createdAt).toLocaleDateString()}
-                            </p>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleResendInvitation(invitation.id)}
+                              disabled={resendingInviteId === invitation.id}
+                              className={cn(
+                                "rounded p-1.5 text-[hsl(var(--text-ghost))]",
+                                "hover:bg-[hsl(var(--cyan)/0.1)] hover:text-[hsl(var(--cyan))]",
+                                "disabled:opacity-50",
+                                "transition-colors"
+                              )}
+                              title="Resend invitation email"
+                            >
+                              <ReloadIcon
+                                className={cn(
+                                  "h-4 w-4",
+                                  resendingInviteId === invitation.id && "animate-spin"
+                                )}
+                              />
+                            </button>
+                            <button
+                              onClick={() => handleCancelInvitation(invitation.id)}
+                              disabled={cancellingInviteId === invitation.id}
+                              className={cn(
+                                "rounded p-1.5 text-[hsl(var(--text-ghost))]",
+                                "hover:bg-[hsl(var(--error)/0.1)] hover:text-[hsl(var(--error))]",
+                                "disabled:opacity-50",
+                                "transition-colors"
+                              )}
+                              title="Cancel invitation"
+                            >
+                              <Cross2Icon className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleCancelInvitation(invitation.id)}
-                          disabled={cancellingInviteId === invitation.id}
-                          className={cn(
-                            "rounded p-1.5 text-[hsl(var(--text-ghost))]",
-                            "hover:bg-[hsl(var(--error)/0.1)] hover:text-[hsl(var(--error))]",
-                            "disabled:opacity-50",
-                            "transition-colors"
-                          )}
-                          title="Cancel invitation"
-                        >
-                          <Cross2Icon className="h-4 w-4" />
-                        </button>
+                        {/* Resend result feedback */}
+                        {resendResult?.invitationId === invitation.id && (
+                          <div
+                            className={cn(
+                              "flex items-center gap-2 rounded-lg px-4 py-2 text-xs",
+                              resendResult.success
+                                ? "bg-green-500/10 text-green-500"
+                                : "bg-[hsl(var(--error)/0.1)] text-[hsl(var(--error))]"
+                            )}
+                          >
+                            {resendResult.success ? (
+                              <CheckIcon className="h-3.5 w-3.5" />
+                            ) : (
+                              <Cross2Icon className="h-3.5 w-3.5" />
+                            )}
+                            <span className="flex-1">{resendResult.message}</span>
+                            {!resendResult.success && resendResult.invitationUrl && (
+                              <button
+                                onClick={() => handleCopyInviteLink(resendResult.invitationUrl!)}
+                                className={cn(
+                                  "inline-flex items-center gap-1 rounded px-2 py-1",
+                                  "bg-[hsl(var(--surface))]",
+                                  "hover:bg-[hsl(var(--surface-hover))]",
+                                  "text-[hsl(var(--text))]"
+                                )}
+                              >
+                                <CopyIcon className="h-3 w-3" />
+                                Copy link
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -171,16 +171,6 @@ export const PublishPanel: React.FC = () => {
       <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-8 sm:mb-10">
-          <div
-            className={cn(
-              "mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1",
-              "bg-[hsl(var(--surface))]",
-              "border border-[hsl(var(--glass-border))]"
-            )}
-          >
-            <span className="text-xs font-semibold text-[hsl(var(--cyan))]">5</span>
-            <span className="text-xs font-medium text-[hsl(var(--text-subtle))]">Step 5 of 5</span>
-          </div>
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[hsl(var(--text))] sm:text-3xl">
             Publish
           </h1>

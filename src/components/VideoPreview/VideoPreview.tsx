@@ -176,16 +176,6 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({ onComplete }) => {
       <div className="mx-auto max-w-5xl">
         {/* Header */}
         <div className="mb-8 sm:mb-10">
-          <div
-            className={cn(
-              "mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1",
-              "bg-[hsl(var(--surface))]",
-              "border border-[hsl(var(--glass-border))]"
-            )}
-          >
-            <span className="text-xs font-semibold text-[hsl(var(--cyan))]">4</span>
-            <span className="text-xs font-medium text-[hsl(var(--text-subtle))]">Step 4 of 5</span>
-          </div>
           <h1 className="font-[family-name:var(--font-display)] text-2xl font-bold tracking-tight text-[hsl(var(--text))] sm:text-3xl">
             Preview & Edit
           </h1>

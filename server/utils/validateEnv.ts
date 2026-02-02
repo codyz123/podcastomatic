@@ -16,6 +16,16 @@ const ENV_VARS: EnvVar[] = [
   { name: "BLOB_READ_WRITE_TOKEN", required: false, description: "Vercel Blob storage token" },
   { name: "OPENAI_API_KEY", required: false, description: "OpenAI API key for transcription" },
   { name: "RESEND_API_KEY", required: false, description: "Resend API key for invitation emails" },
+  {
+    name: "RESEND_FROM_EMAIL",
+    required: false,
+    description: "Verified email address for sending invitations (e.g., noreply@yourdomain.com)",
+  },
+  {
+    name: "APP_URL",
+    required: false,
+    description: "Frontend URL for email links (e.g., https://app.yourdomain.com)",
+  },
 ];
 
 export function validateEnv(): void {
@@ -61,5 +71,23 @@ export function validateEnv(): void {
       console.warn(`   • ${envVar.name} - ${envVar.description}`);
     }
     console.warn("   Some features may not work without these.\n");
+  }
+
+  // Special warning for email configuration
+  if (process.env.RESEND_API_KEY && !process.env.RESEND_FROM_EMAIL) {
+    console.warn("=".repeat(60));
+    console.warn("⚠️  EMAIL CONFIGURATION WARNING");
+    console.warn("=".repeat(60));
+    console.warn("");
+    console.warn("RESEND_API_KEY is set, but RESEND_FROM_EMAIL is not configured.");
+    console.warn("This means invitation emails will use Resend's testing domain,");
+    console.warn("which can ONLY send emails to the Resend account owner.");
+    console.warn("");
+    console.warn("To send invitations to other users:");
+    console.warn("1. Verify your domain at https://resend.com/domains");
+    console.warn("2. Set RESEND_FROM_EMAIL to an email on your verified domain");
+    console.warn("   Example: RESEND_FROM_EMAIL=noreply@yourdomain.com");
+    console.warn("");
+    console.warn("=".repeat(60) + "\n");
   }
 }

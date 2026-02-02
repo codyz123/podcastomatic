@@ -11,6 +11,7 @@ import {
 import { Button, Card, CardContent, Input } from "./ui";
 import { StageProgressBar } from "./ui/StageProgressBar";
 import { useEpisodes, Episode, EpisodeWithDetails } from "../hooks/useEpisodes";
+import type { StageStatus } from "./EpisodePipeline/EpisodePipeline";
 import { useProjectStore } from "../stores/projectStore";
 import { Project, Transcript, Clip } from "../lib/types";
 import { useAuthStore } from "../stores/authStore";
@@ -74,11 +75,12 @@ function episodeToProject(episode: EpisodeWithDetails): Project {
 }
 
 interface ProjectsViewProps {
-  onProjectLoad: () => void;
+  onProjectLoad: (episodeId: string) => void;
 }
 
 export const ProjectsView: React.FC<ProjectsViewProps> = ({ onProjectLoad }) => {
-  const { episodes, isLoading, createEpisode, fetchEpisode, deleteEpisode } = useEpisodes();
+  const { episodes, isLoading, createEpisode, fetchEpisode, deleteEpisode, updateStageStatus } =
+    useEpisodes();
   const { setCurrentProject } = useProjectStore();
   const { podcasts, currentPodcastId } = useAuthStore();
 
@@ -106,7 +108,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onProjectLoad }) => 
         if (fullEpisode) {
           const project = episodeToProject(fullEpisode);
           setCurrentProject(project);
-          onProjectLoad();
+          onProjectLoad(fullEpisode.id);
         }
       }
     }
@@ -117,7 +119,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onProjectLoad }) => 
     if (episode) {
       const project = episodeToProject(episode);
       setCurrentProject(project);
-      onProjectLoad();
+      onProjectLoad(episodeId);
     }
   };
 
@@ -146,6 +148,14 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onProjectLoad }) => 
       return episode.guests[0].name;
     }
     return null;
+  };
+
+  const handleStageStatusChange = async (
+    episodeId: string,
+    stageId: string,
+    nextStatus: StageStatus
+  ) => {
+    await updateStageStatus(episodeId, stageId, nextStatus);
   };
 
   return (
@@ -289,6 +299,11 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onProjectLoad }) => 
                         {/* Episode Name + Duration */}
                         <div className="w-[280px] min-w-0 flex-shrink-0">
                           <h3 className="truncate font-[family-name:var(--font-display)] text-sm font-semibold text-[hsl(var(--text))]">
+                            {episode.episodeNumber && (
+                              <span className="mr-2 text-[hsl(var(--text-ghost))]">
+                                #{episode.episodeNumber}
+                              </span>
+                            )}
                             {episode.name}
                           </h3>
                           <div className="mt-0.5 flex items-center gap-2 text-xs text-[hsl(var(--text-ghost))]">
@@ -329,7 +344,12 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onProjectLoad }) => 
 
                         {/* Stage Progress Bar */}
                         <div className="hidden flex-1 sm:block">
-                          <StageProgressBar stageStatus={episode.stageStatus} />
+                          <StageProgressBar
+                            stageStatus={episode.stageStatus}
+                            onStageStatusChange={(stageId, nextStatus) =>
+                              handleStageStatusChange(episode.id, stageId, nextStatus)
+                            }
+                          />
                         </div>
 
                         {/* Actions */}
@@ -373,7 +393,13 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onProjectLoad }) => 
                             {formatPublishDate(episode.publishDate)}
                           </span>
                         )}
-                        <StageProgressBar stageStatus={episode.stageStatus} compact />
+                        <StageProgressBar
+                          stageStatus={episode.stageStatus}
+                          compact
+                          onStageStatusChange={(stageId, nextStatus) =>
+                            handleStageStatusChange(episode.id, stageId, nextStatus)
+                          }
+                        />
                       </div>
                     </div>
                   );

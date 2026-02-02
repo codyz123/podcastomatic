@@ -1,5 +1,6 @@
 import { put, del, list } from "@vercel/blob";
 import { neon } from "@neondatabase/serverless";
+import { readFileSync } from "fs";
 
 // Get database connection
 function getDb() {
@@ -100,6 +101,33 @@ export async function uploadMedia(
   return {
     url: blob.url,
     size: file.length,
+  };
+}
+
+// Upload a file from disk path to Vercel Blob
+export async function uploadMediaFromPath(
+  filePath: string,
+  filename: string,
+  contentType: string,
+  folder: string = "media"
+): Promise<{ url: string; size: number }> {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    throw new Error("BLOB_READ_WRITE_TOKEN environment variable is required");
+  }
+
+  const pathname = `${folder}/${Date.now()}-${filename}`;
+  const fileBuffer = readFileSync(filePath);
+
+  const blob = await put(pathname, fileBuffer, {
+    access: "public",
+    contentType,
+    token,
+  });
+
+  return {
+    url: blob.url,
+    size: fileBuffer.length,
   };
 }
 

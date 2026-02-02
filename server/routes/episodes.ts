@@ -4,7 +4,10 @@ import { eq, and, desc } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { projects, podcastMembers, transcripts, clips } from "../db/schema.js";
 import { jwtAuthMiddleware } from "../middleware/auth.js";
-import { uploadMedia, deleteMedia } from "../lib/media-storage.js";
+import { uploadMediaFromPath, deleteMedia } from "../lib/media-storage.js";
+import { randomUUID } from "crypto";
+import { unlink } from "fs/promises";
+import { tmpdir } from "os";
 
 const router = Router();
 
@@ -14,10 +17,14 @@ function getParam(param: string | string[] | undefined): string {
   return param || "";
 }
 
-// Configure multer for file uploads (50MB limit for audio/video)
+// Configure multer for large file uploads (5GB limit for podcast audio)
+// Uses disk storage to avoid memory issues with large files
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  storage: multer.diskStorage({
+    destination: tmpdir(),
+    filename: (_req, _file, cb) => cb(null, `upload-${randomUUID()}`),
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 * 1024 }, // 5GB
 });
 
 // Middleware to verify podcast membership
@@ -66,6 +73,9 @@ router.get("/:podcastId/episodes", verifyPodcastAccess, async (req: Request, res
         episodeNumber: projects.episodeNumber,
         seasonNumber: projects.seasonNumber,
         publishDate: projects.publishDate,
+        showNotes: projects.showNotes,
+        explicit: projects.explicit,
+        guests: projects.guests,
         stageStatus: projects.stageStatus,
         createdAt: projects.createdAt,
         updatedAt: projects.updatedAt,
@@ -160,6 +170,9 @@ router.put(
       const episodeId = getParam(req.params.episodeId);
       const updates = req.body;
 
+      console.log("[PUT episode] podcastId:", podcastId, "episodeId:", episodeId);
+      console.log("[PUT episode] updates received:", JSON.stringify(updates));
+
       // Filter to allowed fields
       const allowedFields = [
         "name",
@@ -173,11 +186,27 @@ router.put(
       ];
       const filteredUpdates: Record<string, unknown> = {};
       for (const key of allowedFields) {
-        if (key in updates) {
-          filteredUpdates[key] = updates[key];
+        if (key in updates && updates[key] !== undefined) {
+          const value = updates[key];
+          // Skip null values
+          if (value === null) continue;
+          // Handle date fields - convert empty strings to null, strings to Date objects
+          if (key === "publishDate") {
+            if (value === "" || value === null) {
+              filteredUpdates[key] = null;
+            } else if (typeof value === "string") {
+              filteredUpdates[key] = new Date(value);
+            } else {
+              filteredUpdates[key] = value;
+            }
+          } else {
+            filteredUpdates[key] = value;
+          }
         }
       }
       filteredUpdates.updatedAt = new Date();
+
+      console.log("[PUT episode] filteredUpdates:", JSON.stringify(filteredUpdates));
 
       const [episode] = await db
         .update(projects)
@@ -190,9 +219,10 @@ router.put(
         return;
       }
 
+      console.log("[PUT episode] Success, updated episode:", episode.id);
       res.json({ episode });
     } catch (error) {
-      console.error("Error updating episode:", error);
+      console.error("[PUT episode] Error:", error);
       res.status(500).json({ error: (error as Error).message });
     }
   }
@@ -297,16 +327,16 @@ router.delete(
   }
 );
 
-// Upload audio for an episode
+// Upload audio for an episode (supports files up to 5GB via streaming)
 router.post(
   "/:podcastId/episodes/:episodeId/audio",
   verifyPodcastAccess,
   upload.single("file"),
   async (req: Request, res: Response) => {
+    const file = req.file;
     try {
       const podcastId = getParam(req.params.podcastId);
       const episodeId = getParam(req.params.episodeId);
-      const file = req.file;
       // Duration can be sent as form field (calculated client-side)
       const audioDuration = req.body.audioDuration ? parseFloat(req.body.audioDuration) : undefined;
 
@@ -335,9 +365,9 @@ router.post(
         }
       }
 
-      // Upload to blob storage
-      const { url, size } = await uploadMedia(
-        file.buffer,
+      // Upload to blob storage (streaming from disk for large files)
+      const { url, size } = await uploadMediaFromPath(
+        file.path,
         file.originalname,
         file.mimetype,
         `podcasts/${podcastId}/episodes/${episodeId}`
@@ -359,6 +389,11 @@ router.post(
     } catch (error) {
       console.error("Error uploading audio:", error);
       res.status(500).json({ error: (error as Error).message });
+    } finally {
+      // Clean up temp file
+      if (file?.path) {
+        unlink(file.path).catch((e) => console.error("Failed to delete temp file:", e));
+      }
     }
   }
 );

@@ -2,7 +2,9 @@ import React, { useState, useEffect } from "react";
 import { CalendarIcon, PersonIcon, FileTextIcon } from "@radix-ui/react-icons";
 import { cn } from "../../lib/utils";
 import { useProjectStore } from "../../stores/projectStore";
+import { useEpisodes } from "../../hooks/useEpisodes";
 import { StageProgressBar } from "../ui/StageProgressBar";
+import type { StageStatus } from "../EpisodePipeline/EpisodePipeline";
 
 interface EpisodeMetadata {
   title: string;
@@ -25,6 +27,12 @@ interface Guest {
 
 export const EpisodeInfoPage: React.FC = () => {
   const { currentProject, updateProject } = useProjectStore();
+  const { updateEpisode, updateStageStatus, error: episodeError } = useEpisodes();
+
+  // Debug: log on mount
+  useEffect(() => {
+    console.log("[EpisodeInfoPage] Mounted with project:", currentProject?.id);
+  }, [currentProject?.id]);
 
   const [metadata, setMetadata] = useState<EpisodeMetadata>({
     title: currentProject?.name || "",
@@ -39,6 +47,7 @@ export const EpisodeInfoPage: React.FC = () => {
 
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Sync from store when project changes
   useEffect(() => {
@@ -68,9 +77,11 @@ export const EpisodeInfoPage: React.FC = () => {
   const handleSave = async () => {
     if (!currentProject) return;
 
+    console.log("[EpisodeInfoPage] Saving changes for project:", currentProject.id);
     setIsSaving(true);
+    setSaveError(null);
     try {
-      updateProject({
+      const updates = {
         name: metadata.title,
         description: metadata.description,
         episodeNumber: metadata.episodeNumber,
@@ -79,8 +90,30 @@ export const EpisodeInfoPage: React.FC = () => {
         showNotes: metadata.showNotes,
         explicit: metadata.explicit,
         guests: metadata.guests,
-      });
-      setIsDirty(false);
+      };
+      console.log("[EpisodeInfoPage] Updates:", updates);
+
+      // Persist to database
+      const savedEpisode = await updateEpisode(currentProject.id, updates);
+      console.log("[EpisodeInfoPage] Save result:", savedEpisode);
+
+      if (savedEpisode) {
+        // Update local store on success
+        updateProject(updates);
+        setIsDirty(false);
+        setSaveError(null);
+        console.log("[EpisodeInfoPage] Save successful");
+      } else {
+        // updateEpisode returned null - check for error from hook or show generic message
+        console.error(
+          "[EpisodeInfoPage] Save failed - updateEpisode returned null. episodeError:",
+          episodeError
+        );
+        setSaveError(episodeError || "Failed to save changes. Please try again.");
+      }
+    } catch (err) {
+      console.error("[EpisodeInfoPage] Save error:", err);
+      setSaveError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setIsSaving(false);
     }
@@ -104,6 +137,23 @@ export const EpisodeInfoPage: React.FC = () => {
       "guests",
       metadata.guests.filter((g) => g.id !== id)
     );
+  };
+
+  const handleStageStatusChange = async (stageId: string, nextStatus: StageStatus) => {
+    if (!currentProject) return;
+
+    const previousStageStatus = currentProject.stageStatus || {};
+    const updatedStageStatus = {
+      ...previousStageStatus,
+      [stageId]: { status: nextStatus, updatedAt: new Date().toISOString() },
+    };
+
+    updateProject({ stageStatus: updatedStageStatus });
+
+    const result = await updateStageStatus(currentProject.id, stageId, nextStatus);
+    if (!result) {
+      updateProject({ stageStatus: previousStageStatus });
+    }
   };
 
   if (!currentProject) {
@@ -139,9 +189,20 @@ export const EpisodeInfoPage: React.FC = () => {
           </button>
         </div>
 
+        {/* Error Message */}
+        {saveError && (
+          <div className="mb-6 rounded-lg border border-[hsl(var(--error)/0.3)] bg-[hsl(var(--error)/0.1)] p-4">
+            <p className="text-sm text-[hsl(var(--error))]">{saveError}</p>
+          </div>
+        )}
+
         {/* Pipeline Progress - Full Width */}
         <div className="mb-8">
-          <StageProgressBar stageStatus={currentProject?.stageStatus} fullWidth />
+          <StageProgressBar
+            stageStatus={currentProject?.stageStatus}
+            fullWidth
+            onStageStatusChange={handleStageStatusChange}
+          />
         </div>
 
         {/* Form */}
