@@ -18,7 +18,8 @@ import { AuthScreen, LoadingScreen, CreatePodcastScreen } from "./components/Aut
 import { useProjectStore } from "./stores/projectStore";
 import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useAuthStore } from "./stores/authStore";
-import { applyBrandColors } from "./lib/colorExtractor";
+import { usePodcast } from "./hooks/usePodcast";
+import { applyBrandColors, type BrandColors } from "./lib/colorExtractor";
 import { EpisodeStage, PlanningSubStage } from "./components/EpisodePipeline/EpisodePipeline";
 
 // Check if we're on the OAuth callback page
@@ -73,20 +74,38 @@ function App() {
   const [isRestoring, setIsRestoring] = useState(true);
 
   const { currentProject, projects, loadProject } = useProjectStore();
-  const { brandColors } = useWorkspaceStore();
+  const { brandColors, setBrandColors } = useWorkspaceStore();
   const {
     isAuthenticated,
     isLoading: authLoading,
     checkAuth,
     podcasts,
+    currentPodcastId,
     showCreatePodcast,
     setShowCreatePodcast,
   } = useAuthStore();
+  const { podcast } = usePodcast();
 
   // Check authentication on mount
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Sync brand colors from current podcast when it changes
+  useEffect(() => {
+    if (podcast?.brandColors) {
+      const colors: BrandColors = {
+        primary: podcast.brandColors.primary || "",
+        secondary: podcast.brandColors.secondary || "",
+        primaryHsl: "",
+        secondaryHsl: "",
+      };
+      setBrandColors(colors);
+    } else if (currentPodcastId) {
+      // Clear brand colors if podcast has none
+      setBrandColors(null);
+    }
+  }, [podcast?.brandColors, currentPodcastId, setBrandColors]);
 
   // Apply brand colors on mount and when they change
   useEffect(() => {

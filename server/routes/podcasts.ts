@@ -234,7 +234,8 @@ podcastsRouter.post(
       res.json({ coverImageUrl: url, podcast: updated });
     } catch (error) {
       console.error("Cover upload error:", error);
-      res.status(500).json({ error: "Failed to upload cover image" });
+      const message = error instanceof Error ? error.message : "Unknown error";
+      res.status(500).json({ error: `Failed to upload: ${message}` });
     }
   }
 );

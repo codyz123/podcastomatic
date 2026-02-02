@@ -11,7 +11,7 @@ import { Button, Card, CardContent, Input } from "./ui";
 import { CircularProgress } from "./ui/Progress";
 import { useEpisodes, Episode } from "../hooks/useEpisodes";
 import { useProjectStore } from "../stores/projectStore";
-import { useWorkspaceStore } from "../stores/workspaceStore";
+import { useAuthStore } from "../stores/authStore";
 import { formatDuration } from "../lib/formats";
 import { cn } from "../lib/utils";
 import { ConfirmationDialog } from "./ui/ConfirmationDialog";
@@ -23,7 +23,7 @@ interface ProjectsViewProps {
 export const ProjectsView: React.FC<ProjectsViewProps> = ({ onProjectLoad }) => {
   const { episodes, isLoading, createEpisode, fetchEpisode, deleteEpisode } = useEpisodes();
   const { currentProject, loadProject } = useProjectStore();
-  const { podcastMetadata } = useWorkspaceStore();
+  const { podcasts, currentPodcastId } = useAuthStore();
 
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
@@ -31,7 +31,9 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ onProjectLoad }) => 
   const [deleteTarget, setDeleteTarget] = useState<Episode | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const podcastName = podcastMetadata.name || "My Podcast";
+  // Get podcast name from current podcast in authStore
+  const currentPodcast = podcasts.find((p) => p.id === currentPodcastId);
+  const podcastName = currentPodcast?.name || "My Podcast";
 
   const handleCreateProject = async () => {
     if (newProjectName.trim()) {
