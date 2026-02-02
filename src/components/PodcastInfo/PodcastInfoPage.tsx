@@ -12,7 +12,7 @@ import {
 } from "@radix-ui/react-icons";
 import { cn } from "../../lib/utils";
 import { useWorkspaceStore, PodcastMetadata } from "../../stores/workspaceStore";
-import { extractBrandColors, BrandColors } from "../../lib/colorExtractor";
+import { extractBrandColors, parseBrandColorsFromStorage } from "../../lib/colorExtractor";
 import { usePodcast } from "../../hooks/usePodcast";
 import { useAuthStore } from "../../stores/authStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -140,13 +140,10 @@ export const PodcastInfoPage: React.FC = () => {
   // Apply brand colors from backend when podcast loads
   useEffect(() => {
     if (podcast?.brandColors) {
-      const colors: BrandColors = {
-        primary: podcast.brandColors.primary || "",
-        secondary: podcast.brandColors.secondary || "",
-        primaryHsl: "",
-        secondaryHsl: "",
-      };
-      setBrandColors(colors);
+      const colors = parseBrandColorsFromStorage(podcast.brandColors);
+      if (colors) {
+        setBrandColors(colors);
+      }
     }
   }, [podcast?.brandColors, setBrandColors]);
 

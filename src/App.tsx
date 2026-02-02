@@ -19,7 +19,7 @@ import { useProjectStore } from "./stores/projectStore";
 import { useWorkspaceStore } from "./stores/workspaceStore";
 import { useAuthStore } from "./stores/authStore";
 import { usePodcast } from "./hooks/usePodcast";
-import { applyBrandColors, type BrandColors } from "./lib/colorExtractor";
+import { applyBrandColors, parseBrandColorsFromStorage } from "./lib/colorExtractor";
 import { EpisodeStage, PlanningSubStage } from "./components/EpisodePipeline/EpisodePipeline";
 
 // Check if we're on the OAuth callback page
@@ -94,12 +94,7 @@ function App() {
   // Sync brand colors from current podcast when it changes
   useEffect(() => {
     if (podcast?.brandColors) {
-      const colors: BrandColors = {
-        primary: podcast.brandColors.primary || "",
-        secondary: podcast.brandColors.secondary || "",
-        primaryHsl: "",
-        secondaryHsl: "",
-      };
+      const colors = parseBrandColorsFromStorage(podcast.brandColors);
       setBrandColors(colors);
     } else if (currentPodcastId) {
       // Clear brand colors if podcast has none
