@@ -65,6 +65,8 @@ export const podcasts = pgTable("podcasts", {
     category?: string;
     language?: string;
     explicit?: boolean;
+    email?: string;
+    website?: string;
   }>(),
   brandColors: jsonb("brand_colors").$type<{
     primary?: string;

@@ -10,6 +10,7 @@ import { podcastsRouter } from "./routes/podcasts.js";
 import { authMiddleware } from "./middleware/auth.js";
 import { initializeDatabase } from "./lib/token-storage.js";
 import { initializeMediaTables } from "./lib/media-storage.js";
+import { validateEnv } from "./utils/validateEnv.js";
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -69,6 +70,9 @@ app.use(errorHandler);
 
 // Initialize database and start server
 async function start() {
+  // Validate environment variables first - fail fast with clear instructions
+  validateEnv();
+
   try {
     await initializeDatabase();
     await initializeMediaTables();

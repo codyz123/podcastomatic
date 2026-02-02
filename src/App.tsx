@@ -74,7 +74,14 @@ function App() {
 
   const { currentProject, projects, loadProject } = useProjectStore();
   const { brandColors } = useWorkspaceStore();
-  const { isAuthenticated, isLoading: authLoading, checkAuth, podcasts } = useAuthStore();
+  const {
+    isAuthenticated,
+    isLoading: authLoading,
+    checkAuth,
+    podcasts,
+    showCreatePodcast,
+    setShowCreatePodcast,
+  } = useAuthStore();
 
   // Check authentication on mount
   useEffect(() => {
@@ -319,9 +326,13 @@ function App() {
     return <AuthScreen />;
   }
 
-  // Show create podcast screen if user has no podcasts
-  if (podcasts.length === 0) {
-    return <CreatePodcastScreen />;
+  // Show create podcast screen if user has no podcasts or explicitly requested
+  if (podcasts.length === 0 || showCreatePodcast) {
+    return (
+      <CreatePodcastScreen
+        onCancel={podcasts.length > 0 ? () => setShowCreatePodcast(false) : undefined}
+      />
+    );
   }
 
   return (

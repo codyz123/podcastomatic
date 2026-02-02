@@ -6,6 +6,7 @@ import { useSettingsStore } from "./settingsStore";
 interface AuthStore extends AuthState {
   podcasts: Podcast[];
   currentPodcastId: string | null;
+  showCreatePodcast: boolean;
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
@@ -15,6 +16,7 @@ interface AuthStore extends AuthState {
   checkAuth: () => Promise<void>;
   setCurrentPodcast: (id: string | null) => void;
   setPodcasts: (podcasts: Podcast[]) => void;
+  setShowCreatePodcast: (show: boolean) => void;
 }
 
 function getApiBase(): string {
@@ -33,6 +35,7 @@ export const useAuthStore = create<AuthStore>()(
       error: null,
       podcasts: [],
       currentPodcastId: null,
+      showCreatePodcast: false,
 
       // Actions
       login: async (email, password) => {
@@ -220,6 +223,8 @@ export const useAuthStore = create<AuthStore>()(
           podcasts,
           currentPodcastId: get().currentPodcastId || podcasts[0]?.id || null,
         }),
+
+      setShowCreatePodcast: (show) => set({ showCreatePodcast: show }),
     }),
     {
       name: "podcastomatic-auth",

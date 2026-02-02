@@ -4,6 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "postinstall": "bash scripts/setup-env.sh",
+    "setup": "bash scripts/setup-env.sh",
     "dev": "vite",
     "dev:server": "tsx watch --env-file=.env.local server/index.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
