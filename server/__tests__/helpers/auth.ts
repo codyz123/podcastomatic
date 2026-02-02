@@ -1,4 +1,4 @@
-import jwt from "jsonwebtoken";
+import jwt, { type SignOptions } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -28,21 +28,21 @@ export function generateTestAccessToken(
 ): string {
   return jwt.sign({ userId, email, type: "access" }, TEST_JWT_SECRET, {
     expiresIn,
-  });
+  } as SignOptions);
 }
 
 // Generate an expired access token for testing
 export function generateExpiredAccessToken(userId: string, email: string): string {
   return jwt.sign({ userId, email, type: "access" }, TEST_JWT_SECRET, {
     expiresIn: "-1s",
-  });
+  } as SignOptions);
 }
 
 // Generate a valid refresh token for testing
 export function generateTestRefreshToken(userId: string, expiresIn: string = "7d"): string {
   return jwt.sign({ userId, type: "refresh", jti: crypto.randomUUID() }, TEST_JWT_REFRESH_SECRET, {
     expiresIn,
-  });
+  } as SignOptions);
 }
 
 // Generate a hashed password for test users
