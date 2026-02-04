@@ -203,11 +203,16 @@ export async function getAllTokenStatuses(): Promise<
   return platforms.map((platform) => {
     const token = tokenMap.get(platform);
     if (token) {
+      // expires_at may be a Date object or a string depending on the driver
+      const expiresAt =
+        token.expires_at instanceof Date
+          ? token.expires_at.toISOString()
+          : String(token.expires_at);
       return {
         platform,
         connected: true,
         accountName: token.account_name as string,
-        expiresAt: (token.expires_at as Date).toISOString(),
+        expiresAt,
       };
     }
     return {
