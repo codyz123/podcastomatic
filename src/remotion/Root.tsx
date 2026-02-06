@@ -1,8 +1,14 @@
 import React from "react";
-import { Composition } from "remotion";
+import { Composition, CalculateMetadataFunction } from "remotion";
 import { ClipVideo } from "./Composition";
 import { VIDEO_FORMATS, VideoFormat, BackgroundConfig, SubtitleConfig } from "../lib/types";
 import { ClipVideoProps, WordTiming } from "./types";
+
+// Calculate duration dynamically from inputProps instead of hardcoding
+const calculateMetadata: CalculateMetadataFunction<ClipVideoProps> = async ({ props }) => ({
+  durationInFrames: props.durationInFrames,
+  fps: props.fps || 30,
+});
 
 // Default props for preview - using explicit types
 const defaultWords: WordTiming[] = [
@@ -34,6 +40,8 @@ const defaultSubtitle: SubtitleConfig = {
 
 const createDefaultProps = (format: VideoFormat): ClipVideoProps => ({
   audioUrl: "",
+  audioStartFrame: 0,
+  audioEndFrame: 180,
   words: defaultWords,
   format,
   background: defaultBackground,
@@ -52,7 +60,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="ClipVideo-9-16"
         component={ClipVideoComponent}
-        durationInFrames={180}
+        calculateMetadata={calculateMetadata}
         fps={30}
         width={VIDEO_FORMATS["9:16"].width}
         height={VIDEO_FORMATS["9:16"].height}
@@ -63,7 +71,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="ClipVideo-1-1"
         component={ClipVideoComponent}
-        durationInFrames={180}
+        calculateMetadata={calculateMetadata}
         fps={30}
         width={VIDEO_FORMATS["1:1"].width}
         height={VIDEO_FORMATS["1:1"].height}
@@ -74,7 +82,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="ClipVideo-16-9"
         component={ClipVideoComponent}
-        durationInFrames={180}
+        calculateMetadata={calculateMetadata}
         fps={30}
         width={VIDEO_FORMATS["16:9"].width}
         height={VIDEO_FORMATS["16:9"].height}
@@ -85,7 +93,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="ClipVideo-4-5"
         component={ClipVideoComponent}
-        durationInFrames={180}
+        calculateMetadata={calculateMetadata}
         fps={30}
         width={VIDEO_FORMATS["4:5"].width}
         height={VIDEO_FORMATS["4:5"].height}
