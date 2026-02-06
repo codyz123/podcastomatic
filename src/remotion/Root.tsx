@@ -1,11 +1,12 @@
 import React from "react";
-import { Composition, CalculateMetadataFunction } from "remotion";
+import { Composition } from "remotion";
 import { ClipVideo } from "./Composition";
 import { VIDEO_FORMATS, VideoFormat, BackgroundConfig, SubtitleConfig } from "../lib/types";
 import { ClipVideoProps, WordTiming } from "./types";
 
 // Calculate duration dynamically from inputProps instead of hardcoding
-const calculateMetadata: CalculateMetadataFunction<ClipVideoProps> = async ({ props }) => ({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const calculateMetadata = async ({ props }: { props: any }) => ({
   durationInFrames: props.durationInFrames,
   fps: props.fps || 30,
 });

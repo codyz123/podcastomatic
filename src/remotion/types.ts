@@ -10,7 +10,8 @@ export interface TrackClipData {
   assetSource?: "lottie" | "giphy" | "tenor";
   positionX?: number; // 0-100, default 50
   positionY?: number; // 0-100, default 50
-  lottieData?: object; // Pre-fetched Lottie JSON data
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  lottieData?: Record<string, any>; // Pre-fetched Lottie JSON data
 }
 
 export interface TrackData {

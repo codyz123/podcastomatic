@@ -12,8 +12,20 @@ type RenderGate = {
 const renderGate: RenderGate = {};
 
 vi.mock("node:fs", () => ({
+  default: {
+    mkdirSync: vi.fn(),
+    unlinkSync: vi.fn(),
+  },
   mkdirSync: vi.fn(),
   unlinkSync: vi.fn(),
+}));
+
+vi.mock("node:child_process", () => ({
+  execSync: vi.fn(() => {
+    const err = new Error("ffprobe not available") as NodeJS.ErrnoException;
+    err.code = "ENOENT";
+    throw err;
+  }),
 }));
 
 vi.mock("@remotion/bundler", () => ({
@@ -51,6 +63,15 @@ vi.mock("../../db/index.js", () => {
     rendered_clips_v2: [],
   };
 
+  const getTableName = (table: any): string => {
+    // Drizzle stores table name in Symbol('drizzle:Name'), not in _.name
+    if (table?._?.name) return table._.name;
+    const sym = Object.getOwnPropertySymbols(table).find(
+      (s) => s.toString() === "Symbol(drizzle:Name)"
+    );
+    return sym ? table[sym] : "unknown";
+  };
+
   const pickColumns = (row: Record<string, unknown>, selectCols: Record<string, unknown>) => {
     if (!selectCols || Object.keys(selectCols).length === 0) return row;
     const result: Record<string, unknown> = {};
@@ -63,7 +84,7 @@ vi.mock("../../db/index.js", () => {
   const db = {
     select: vi.fn((selectCols?: Record<string, unknown>) => ({
       from: vi.fn((table: any) => {
-        const tableName = table?._?.name as string;
+        const tableName = getTableName(table);
         const resolveRows = () => {
           const rows = tables[tableName] || [];
           return selectCols ? rows.map((row) => pickColumns(row, selectCols)) : rows;
@@ -80,7 +101,7 @@ vi.mock("../../db/index.js", () => {
     })),
     insert: vi.fn((table: any) => ({
       values: vi.fn((data: Record<string, unknown>) => {
-        const tableName = table?._?.name as string;
+        const tableName = getTableName(table);
         const row = {
           id: crypto.randomUUID(),
           ...data,
@@ -95,7 +116,7 @@ vi.mock("../../db/index.js", () => {
     update: vi.fn((table: any) => ({
       set: vi.fn((data: Record<string, unknown>) => ({
         where: vi.fn(async () => {
-          const tableName = table?._?.name as string;
+          const tableName = getTableName(table);
           tables[tableName] = (tables[tableName] || []).map((row) => ({
             ...row,
             ...data,

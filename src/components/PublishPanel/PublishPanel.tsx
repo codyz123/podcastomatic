@@ -407,7 +407,8 @@ export const PublishPanel: React.FC = () => {
         return `${stage} clip`;
       }
 
-      const stage = activePost.statusData.stage;
+      const stage =
+        activePost.statusData.status === "uploading" ? activePost.statusData.stage : undefined;
       const stageLabel =
         stage === "processing"
           ? "Processing"

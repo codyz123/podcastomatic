@@ -34,7 +34,9 @@ export const AnimationOverlay: React.FC<AnimationOverlayProps> = ({ clip }) => {
     return (
       <div style={containerStyle}>
         <Lottie
-          animationData={lottieData}
+          // Lottie data is fetched as JSON and typed loosely; cast to satisfy Remotion's strict type
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          animationData={lottieData as any}
           loop={true}
           playbackRate={1}
           renderer="svg"

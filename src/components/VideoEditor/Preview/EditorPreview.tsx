@@ -1,16 +1,14 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import Lottie from "lottie-react";
-import {
-  Clip,
-  VideoFormat,
-  VideoTemplate,
-  VIDEO_FORMATS,
-  CaptionStyle,
-  TrackClip,
-} from "../../../lib/types";
+import { Clip, VideoFormat, VideoTemplate, VIDEO_FORMATS, TrackClip } from "../../../lib/types";
 import { cn } from "../../../lib/utils";
 import { resolveFontFamily } from "../../../lib/fonts";
-import { resolveCaptionStyle, toSubtitleConfig, toWordTimings } from "../../../lib/clipTransform";
+import {
+  resolveCaptionStyle,
+  toSubtitleConfig,
+  toWordTimings,
+  type CaptionStyle,
+} from "../../../lib/clipTransform";
 import { fetchLottieData } from "../../../services/assets/lottieService";
 
 // Component to render a single Lottie animation with lazy loading

@@ -137,6 +137,18 @@ vi.mock("../../lib/token-storage.js", () => ({
   isTokenExpired: vi.fn(async () => false),
 }));
 
+vi.mock("../../lib/media-storage.js", () => ({
+  getRenderedClipsForClip: vi.fn(async (clipId: string) => [
+    {
+      id: `rendered-${clipId}`,
+      format: "9:16",
+      blobUrl: "https://r2.example.com/video.mp4",
+      sizeBytes: 1000,
+      renderedAt: new Date().toISOString(),
+    },
+  ]),
+}));
+
 vi.mock("../../lib/instagram-upload.js", () => ({
   createMediaContainer: vi.fn(async () => "container123"),
   getContainerStatus: vi.fn(async () => ({ statusCode: "FINISHED" })),
