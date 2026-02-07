@@ -571,7 +571,6 @@ export const AudioImport: React.FC<AudioImportProps> = ({ onComplete }) => {
   return (
     <div className="min-h-full">
       <div className="mx-auto max-w-2xl">
-
         {/* Hidden file input for file picker */}
         <input
           ref={fileInputRef}

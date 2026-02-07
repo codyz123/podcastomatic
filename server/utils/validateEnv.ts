@@ -18,7 +18,11 @@ const ENV_VARS: EnvVar[] = [
   { name: "R2_SECRET_ACCESS_KEY", required: false, description: "Cloudflare R2 secret key" },
   { name: "R2_BUCKET_NAME", required: false, description: "Cloudflare R2 bucket name" },
   { name: "R2_PUBLIC_URL", required: false, description: "Cloudflare R2 public URL" },
-  { name: "OPENAI_API_KEY", required: false, description: "OpenAI API key for transcription (fallback)" },
+  {
+    name: "OPENAI_API_KEY",
+    required: false,
+    description: "OpenAI API key for transcription (fallback)",
+  },
   {
     name: "ASSEMBLYAI_API_KEY",
     required: false,

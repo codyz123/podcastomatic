@@ -230,7 +230,10 @@ export const PodcastInfoPage: React.FC = () => {
     setDeletingPersonId(null);
   };
 
-  const handlePersonPhotoUpload = async (personId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePersonPhotoUpload = async (
+    personId: string,
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
     await uploadPhoto(personId, file);
@@ -582,7 +585,8 @@ export const PodcastInfoPage: React.FC = () => {
             </h2>
             <div className="rounded-xl border border-[hsl(var(--border-subtle))] bg-[hsl(var(--surface)/0.5)] p-5">
               <p className="mb-4 text-sm text-[hsl(var(--text-muted))]">
-                Recurring hosts and guests for this podcast. These will appear as options when editing speakers in transcripts.
+                Recurring hosts and guests for this podcast. These will appear as options when
+                editing speakers in transcripts.
               </p>
 
               {/* People list */}
@@ -641,15 +645,18 @@ export const PodcastInfoPage: React.FC = () => {
                       "rounded-lg px-4 py-2 text-sm font-medium",
                       "bg-[hsl(var(--cyan))] text-white",
                       "hover:bg-[hsl(var(--cyan)/0.9)]",
-                      "disabled:opacity-50 disabled:cursor-not-allowed",
+                      "disabled:cursor-not-allowed disabled:opacity-50",
                       "transition-colors"
                     )}
                   >
                     Add
                   </button>
                   <button
-                    onClick={() => { setIsAddingPerson(false); setNewPersonName(""); }}
-                    className="rounded-lg p-2 text-[hsl(var(--text-muted))] hover:text-[hsl(var(--text))] transition-colors"
+                    onClick={() => {
+                      setIsAddingPerson(false);
+                      setNewPersonName("");
+                    }}
+                    className="rounded-lg p-2 text-[hsl(var(--text-muted))] transition-colors hover:text-[hsl(var(--text))]"
                   >
                     <Cross2Icon className="h-4 w-4" />
                   </button>
@@ -758,7 +765,7 @@ const PersonCard: React.FC<{
       {/* Avatar */}
       <button
         onClick={() => fileInputRef.current?.click()}
-        className="group relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-[hsl(var(--surface))] border border-[hsl(var(--border-subtle))]"
+        className="group relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full border border-[hsl(var(--border-subtle))] bg-[hsl(var(--surface))]"
         title="Upload photo"
       >
         {person.photoUrl ? (
@@ -768,7 +775,7 @@ const PersonCard: React.FC<{
             {initials}
           </span>
         )}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
           <CameraIcon className="h-4 w-4 text-white" />
         </div>
         <input
@@ -781,7 +788,7 @@ const PersonCard: React.FC<{
       </button>
 
       {/* Name */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         {isEditingName ? (
           <input
             type="text"
@@ -790,7 +797,10 @@ const PersonCard: React.FC<{
             onBlur={saveName}
             onKeyDown={(e) => {
               if (e.key === "Enter") saveName();
-              if (e.key === "Escape") { setNameValue(person.name); setIsEditingName(false); }
+              if (e.key === "Escape") {
+                setNameValue(person.name);
+                setIsEditingName(false);
+              }
             }}
             autoFocus
             className={cn(
@@ -804,7 +814,7 @@ const PersonCard: React.FC<{
         ) : (
           <button
             onClick={() => setIsEditingName(true)}
-            className="truncate text-sm font-medium text-[hsl(var(--text))] hover:text-[hsl(var(--cyan))] transition-colors"
+            className="truncate text-sm font-medium text-[hsl(var(--text))] transition-colors hover:text-[hsl(var(--cyan))]"
           >
             {person.name}
           </button>
@@ -828,7 +838,7 @@ const PersonCard: React.FC<{
       {/* Delete */}
       <button
         onClick={() => onDelete(person.id)}
-        className="rounded p-1.5 text-[hsl(var(--text-ghost))] hover:text-[hsl(var(--error))] transition-colors"
+        className="rounded p-1.5 text-[hsl(var(--text-ghost))] transition-colors hover:text-[hsl(var(--error))]"
         title="Remove person"
       >
         <Cross2Icon className="h-3.5 w-3.5" />

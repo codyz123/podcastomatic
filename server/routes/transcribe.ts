@@ -192,7 +192,7 @@ async function transcribeWithAssemblyAI(
     }
   }
 
-  const duration = (completed.audio_duration || 0);
+  const duration = completed.audio_duration || 0;
   const language = completed.language_code || "en";
 
   return {
@@ -412,7 +412,11 @@ async function transcribeWithWhisper(
         detail: `${i * 10}:00 - ${(i + 1) * 10}:00`,
       });
 
-      const chunkResult = await transcribeSingleFileWhisper(openai, chunkPaths[i], `chunk-${i}.mp3`);
+      const chunkResult = await transcribeSingleFileWhisper(
+        openai,
+        chunkPaths[i],
+        `chunk-${i}.mp3`
+      );
       results.push(chunkResult);
 
       progress({
@@ -442,14 +446,15 @@ async function transcribeWithWhisper(
 router.post("/transcribe", upload.single("file"), async (req: Request, res: Response) => {
   const filesToCleanup: string[] = [];
 
-  const assemblyaiKey = (req.headers["x-assemblyai-key"] as string) || process.env.ASSEMBLYAI_API_KEY;
+  const assemblyaiKey =
+    (req.headers["x-assemblyai-key"] as string) || process.env.ASSEMBLYAI_API_KEY;
   const useAssemblyAI = !!assemblyaiKey;
   const hasWhisper = !!process.env.OPENAI_API_KEY || !!req.headers["x-openai-key"];
 
   if (!useAssemblyAI && !hasWhisper) {
-    res
-      .status(500)
-      .json({ error: "No transcription API key configured. Set ASSEMBLYAI_API_KEY or OPENAI_API_KEY." });
+    res.status(500).json({
+      error: "No transcription API key configured. Set ASSEMBLYAI_API_KEY or OPENAI_API_KEY.",
+    });
     return;
   }
 
@@ -506,7 +511,13 @@ router.post("/transcribe", upload.single("file"), async (req: Request, res: Resp
       result = await transcribeWithAssemblyAI(uploadPath, progress, assemblyaiKey);
     } else {
       // Whisper fallback — needs conversion, compression, chunking
-      result = await transcribeWithWhisper(uploadPath, originalName, mimetype, req.file.size, progress);
+      result = await transcribeWithWhisper(
+        uploadPath,
+        originalName,
+        mimetype,
+        req.file.size,
+        progress
+      );
     }
 
     progress({

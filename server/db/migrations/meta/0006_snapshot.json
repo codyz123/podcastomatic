@@ -161,12 +161,8 @@
           "name": "clips_v2_project_id_projects_v2_id_fk",
           "tableFrom": "clips_v2",
           "tableTo": "projects_v2",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -174,12 +170,8 @@
           "name": "clips_v2_created_by_id_users_id_fk",
           "tableFrom": "clips_v2",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -347,12 +339,8 @@
           "name": "instagram_uploads_clip_id_clips_v2_id_fk",
           "tableFrom": "instagram_uploads",
           "tableTo": "clips_v2",
-          "columnsFrom": [
-            "clip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["clip_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -360,12 +348,8 @@
           "name": "instagram_uploads_created_by_id_users_id_fk",
           "tableFrom": "instagram_uploads",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -477,12 +461,8 @@
           "name": "media_assets_v2_project_id_projects_v2_id_fk",
           "tableFrom": "media_assets_v2",
           "tableTo": "projects_v2",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -604,12 +584,8 @@
           "name": "oauth_tokens_v2_podcast_id_podcasts_id_fk",
           "tableFrom": "oauth_tokens_v2",
           "tableTo": "podcasts",
-          "columnsFrom": [
-            "podcast_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["podcast_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -706,12 +682,8 @@
           "name": "podcast_invitations_podcast_id_podcasts_id_fk",
           "tableFrom": "podcast_invitations",
           "tableTo": "podcasts",
-          "columnsFrom": [
-            "podcast_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["podcast_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -719,12 +691,8 @@
           "name": "podcast_invitations_invited_by_id_users_id_fk",
           "tableFrom": "podcast_invitations",
           "tableTo": "users",
-          "columnsFrom": [
-            "invited_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["invited_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -794,12 +762,8 @@
           "name": "podcast_members_podcast_id_podcasts_id_fk",
           "tableFrom": "podcast_members",
           "tableTo": "podcasts",
-          "columnsFrom": [
-            "podcast_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["podcast_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -807,12 +771,8 @@
           "name": "podcast_members_user_id_users_id_fk",
           "tableFrom": "podcast_members",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -820,12 +780,8 @@
           "name": "podcast_members_invited_by_id_users_id_fk",
           "tableFrom": "podcast_members",
           "tableTo": "users",
-          "columnsFrom": [
-            "invited_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["invited_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -833,10 +789,7 @@
       "compositePrimaryKeys": {
         "podcast_members_podcast_id_user_id_pk": {
           "name": "podcast_members_podcast_id_user_id_pk",
-          "columns": [
-            "podcast_id",
-            "user_id"
-          ]
+          "columns": ["podcast_id", "user_id"]
         }
       },
       "uniqueConstraints": {},
@@ -935,12 +888,8 @@
           "name": "podcast_people_podcast_id_podcasts_id_fk",
           "tableFrom": "podcast_people",
           "tableTo": "podcasts",
-          "columnsFrom": [
-            "podcast_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["podcast_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1019,12 +968,8 @@
           "name": "podcasts_created_by_id_users_id_fk",
           "tableFrom": "podcasts",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1175,12 +1120,8 @@
           "name": "projects_v2_podcast_id_podcasts_id_fk",
           "tableFrom": "projects_v2",
           "tableTo": "podcasts",
-          "columnsFrom": [
-            "podcast_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["podcast_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1188,12 +1129,8 @@
           "name": "projects_v2_created_by_id_users_id_fk",
           "tableFrom": "projects_v2",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1269,12 +1206,8 @@
           "name": "rendered_clips_v2_clip_id_clips_v2_id_fk",
           "tableFrom": "rendered_clips_v2",
           "tableTo": "clips_v2",
-          "columnsFrom": [
-            "clip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["clip_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1371,12 +1304,8 @@
           "name": "sessions_user_id_users_id_fk",
           "tableFrom": "sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1499,12 +1428,8 @@
           "name": "text_snippets_project_id_projects_v2_id_fk",
           "tableFrom": "text_snippets",
           "tableTo": "projects_v2",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1512,12 +1437,8 @@
           "name": "text_snippets_focus_clip_id_clips_v2_id_fk",
           "tableFrom": "text_snippets",
           "tableTo": "clips_v2",
-          "columnsFrom": [
-            "focus_clip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["focus_clip_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1525,12 +1446,8 @@
           "name": "text_snippets_created_by_id_users_id_fk",
           "tableFrom": "text_snippets",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1683,12 +1600,8 @@
           "name": "tiktok_uploads_clip_id_clips_v2_id_fk",
           "tableFrom": "tiktok_uploads",
           "tableTo": "clips_v2",
-          "columnsFrom": [
-            "clip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["clip_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -1696,12 +1609,8 @@
           "name": "tiktok_uploads_created_by_id_users_id_fk",
           "tableFrom": "tiktok_uploads",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1808,12 +1717,8 @@
           "name": "transcripts_project_id_projects_v2_id_fk",
           "tableFrom": "transcripts",
           "tableTo": "projects_v2",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1821,12 +1726,8 @@
           "name": "transcripts_created_by_id_users_id_fk",
           "tableFrom": "transcripts",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2108,12 +2009,8 @@
           "name": "upload_sessions_podcast_id_podcasts_id_fk",
           "tableFrom": "upload_sessions",
           "tableTo": "podcasts",
-          "columnsFrom": [
-            "podcast_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["podcast_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2121,12 +2018,8 @@
           "name": "upload_sessions_episode_id_projects_v2_id_fk",
           "tableFrom": "upload_sessions",
           "tableTo": "projects_v2",
-          "columnsFrom": [
-            "episode_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["episode_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -2134,12 +2027,8 @@
           "name": "upload_sessions_created_by_id_users_id_fk",
           "tableFrom": "upload_sessions",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2223,9 +2112,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -2375,12 +2262,8 @@
           "name": "x_uploads_clip_id_clips_v2_id_fk",
           "tableFrom": "x_uploads",
           "tableTo": "clips_v2",
-          "columnsFrom": [
-            "clip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["clip_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2388,12 +2271,8 @@
           "name": "x_uploads_created_by_id_users_id_fk",
           "tableFrom": "x_uploads",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2610,12 +2489,8 @@
           "name": "youtube_uploads_clip_id_clips_v2_id_fk",
           "tableFrom": "youtube_uploads",
           "tableTo": "clips_v2",
-          "columnsFrom": [
-            "clip_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["clip_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -2623,12 +2498,8 @@
           "name": "youtube_uploads_created_by_id_users_id_fk",
           "tableFrom": "youtube_uploads",
           "tableTo": "users",
-          "columnsFrom": [
-            "created_by_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["created_by_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }

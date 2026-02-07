@@ -175,7 +175,6 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({ onComplete }) => {
   return (
     <div className="min-h-full">
       <div className="mx-auto max-w-5xl">
-
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Preview Panel */}
           <div className="lg:col-span-2">

@@ -457,7 +457,6 @@ export const PublishPanel: React.FC = () => {
   return (
     <div className="min-h-full">
       <div className="mx-auto max-w-5xl">
-
         {/* Publishing Progress */}
         {isPublishing && (
           <Card variant="default" className="animate-fadeIn mb-6">

@@ -1,4 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo, useImperativeHandle } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  useImperativeHandle,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   ReloadIcon,
@@ -21,7 +28,6 @@ import { Transcript, Word, SpeakerSegment, PodcastPerson } from "../../lib/types
 import { generateId, cn } from "../../lib/utils";
 import { formatTimestamp, formatRelativeTime } from "../../lib/formats";
 import { authFetch } from "../../lib/api";
-
 
 interface ProgressState {
   stage: string;
@@ -91,9 +97,7 @@ const TranscriptVersionSelector = React.memo<TranscriptVersionSelectorProps>(
               </span>
               <span className="text-xs text-[hsl(var(--text-muted))]">
                 · {formatRelativeTime(activeTranscript.createdAt)}
-                {activeTranscript.service && (
-                  <> · {formatServiceName(activeTranscript.service)}</>
-                )}
+                {activeTranscript.service && <> · {formatServiceName(activeTranscript.service)}</>}
               </span>
             </div>
             <ChevronDownIcon
@@ -144,11 +148,8 @@ const TranscriptVersionSelector = React.memo<TranscriptVersionSelectorProps>(
                       )}
                     </div>
                     <p className="mt-0.5 text-xs text-[hsl(var(--text-muted))]">
-                      {t.words.length.toLocaleString()} words ·{" "}
-                      {formatRelativeTime(t.createdAt)}
-                      {t.service && (
-                        <> · {formatServiceName(t.service)}</>
-                      )}
+                      {t.words.length.toLocaleString()} words · {formatRelativeTime(t.createdAt)}
+                      {t.service && <> · {formatServiceName(t.service)}</>}
                     </p>
                   </div>
                   {transcripts.length > 1 && (
@@ -244,35 +245,50 @@ const TranscriptContextMenu = React.memo(
           style={{ left: data.x, top: data.y }}
         >
           <button
-            onClick={() => { onEdit(data.nearestIndex); setData(null); }}
+            onClick={() => {
+              onEdit(data.nearestIndex);
+              setData(null);
+            }}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[hsl(var(--text))] hover:bg-[hsl(var(--surface))]"
           >
             Edit &ldquo;{data.nearestWord}&rdquo;
           </button>
           <button
-            onClick={() => { onRemove(data.nearestIndex); setData(null); }}
+            onClick={() => {
+              onRemove(data.nearestIndex);
+              setData(null);
+            }}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[hsl(var(--error))] hover:bg-[hsl(var(--surface))]"
           >
             Remove &ldquo;{data.nearestWord}&rdquo;
           </button>
           <div className="my-1 border-t border-[hsl(var(--glass-border))]" />
           <button
-            onClick={() => { onInsert(data.nearestIndex, data.secondNearestIndex, data.clickedBefore); setData(null); }}
+            onClick={() => {
+              onInsert(data.nearestIndex, data.secondNearestIndex, data.clickedBefore);
+              setData(null);
+            }}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[hsl(var(--text))] hover:bg-[hsl(var(--surface))]"
           >
-            {data.isBetween
-              ? <>Add word between &ldquo;{data.leftWord}&rdquo; and &ldquo;{data.rightWord}&rdquo;</>
-              : data.clickedBefore
-                ? <>Add word before &ldquo;{data.nearestWord}&rdquo;</>
-                : <>Add word after &ldquo;{data.nearestWord}&rdquo;</>
-            }
+            {data.isBetween ? (
+              <>
+                Add word between &ldquo;{data.leftWord}&rdquo; and &ldquo;{data.rightWord}&rdquo;
+              </>
+            ) : data.clickedBefore ? (
+              <>Add word before &ldquo;{data.nearestWord}&rdquo;</>
+            ) : (
+              <>Add word after &ldquo;{data.nearestWord}&rdquo;</>
+            )}
           </button>
           {(data.canSplit || data.canMerge) && (
             <>
               <div className="my-1 border-t border-[hsl(var(--glass-border))]" />
               {data.canSplit && (
                 <button
-                  onClick={() => { onSplit(data.nearestIndex, data.segmentIndex); setData(null); }}
+                  onClick={() => {
+                    onSplit(data.nearestIndex, data.segmentIndex);
+                    setData(null);
+                  }}
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[hsl(var(--text))] hover:bg-[hsl(var(--surface))]"
                 >
                   Split speaker from &ldquo;{data.nearestWord}&rdquo;
@@ -280,7 +296,10 @@ const TranscriptContextMenu = React.memo(
               )}
               {data.canMerge && (
                 <button
-                  onClick={() => { onMerge(data.nearestIndex, data.segmentIndex); setData(null); }}
+                  onClick={() => {
+                    onMerge(data.nearestIndex, data.segmentIndex);
+                    setData(null);
+                  }}
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[hsl(var(--text))] hover:bg-[hsl(var(--surface))]"
                 >
                   Merge with next speaker from &ldquo;{data.nearestWord}&rdquo;
@@ -408,10 +427,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
   useEffect(() => {
     if (editingSpeakerIdx === null) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        speakerPopoverRef.current &&
-        !speakerPopoverRef.current.contains(e.target as Node)
-      ) {
+      if (speakerPopoverRef.current && !speakerPopoverRef.current.contains(e.target as Node)) {
         setEditingSpeakerIdx(null);
       }
     };
@@ -423,10 +439,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
   useEffect(() => {
     if (confirmDeleteSegIdx === null) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        confirmDeleteRef.current &&
-        !confirmDeleteRef.current.contains(e.target as Node)
-      ) {
+      if (confirmDeleteRef.current && !confirmDeleteRef.current.contains(e.target as Node)) {
         setConfirmDeleteSegIdx(null);
       }
     };
@@ -783,7 +796,11 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
 
         // Find the new end index (last non-dropped word before original end, + 1)
         let newEnd = -1;
-        for (let i = Math.min(seg.endWordIndex - 1, indexMap.length - 1); i >= seg.startWordIndex; i--) {
+        for (
+          let i = Math.min(seg.endWordIndex - 1, indexMap.length - 1);
+          i >= seg.startWordIndex;
+          i--
+        ) {
           if (indexMap[i] !== -1) {
             newEnd = indexMap[i] + 1;
             break;
@@ -1196,10 +1213,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
       handleWordSave();
     } else if (e.key === "Escape") {
       // If editing an empty placeholder (from insert), remove it
-      if (
-        editingWordIndex !== null &&
-        activeTranscript?.words[editingWordIndex]?.text === ""
-      ) {
+      if (editingWordIndex !== null && activeTranscript?.words[editingWordIndex]?.text === "") {
         removeTranscriptWord(editingWordIndex);
       }
       setEditingWordIndex(null);
@@ -1239,7 +1253,12 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
   // Handle saving speaker name edit
   const handleSpeakerSave = useCallback(() => {
     if (editingSpeakerIdx !== null && speakerNameInput.trim()) {
-      handleSpeakerChange(editingSpeakerIdx, speakerNameInput.trim(), undefined, applyToAllSpeakers);
+      handleSpeakerChange(
+        editingSpeakerIdx,
+        speakerNameInput.trim(),
+        undefined,
+        applyToAllSpeakers
+      );
     }
     setEditingSpeakerIdx(null);
     setSpeakerNameInput("");
@@ -1287,9 +1306,17 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
         nearestIndex = parseInt(target.getAttribute("data-word-index")!, 10);
       } else {
         // Probe nearby points for clicks in gaps between words
-        for (const [dx, dy] of [[-12, 0], [12, 0], [0, -8], [0, 8], [-24, 0], [24, 0]]) {
+        for (const [dx, dy] of [
+          [-12, 0],
+          [12, 0],
+          [0, -8],
+          [0, 8],
+          [-24, 0],
+          [24, 0],
+        ]) {
           const el = document.elementFromPoint(e.clientX + dx, e.clientY + dy);
-          const wordEl = el && (el as HTMLElement).closest("[data-word-index]") as HTMLElement | null;
+          const wordEl =
+            el && ((el as HTMLElement).closest("[data-word-index]") as HTMLElement | null);
           if (wordEl) {
             nearestIndex = parseInt(wordEl.getAttribute("data-word-index")!, 10);
             break;
@@ -1477,7 +1504,6 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
   return (
     <div className="min-h-full">
       <div className="mx-auto max-w-3xl">
-
         {/* Transcription Controls */}
         {!hasTranscript && (
           <div className="animate-blurIn">
@@ -1636,9 +1662,12 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
                   </button>
                   <div>
                     <p className="text-sm font-semibold text-[hsl(var(--text))]">
-                      {isPlaying ? "Playing" : (
+                      {isPlaying ? (
+                        "Playing"
+                      ) : (
                         <>
-                          Version {transcripts.findIndex((t) => t.id === activeTranscript.id) + 1} of {transcripts.length}
+                          Version {transcripts.findIndex((t) => t.id === activeTranscript.id) + 1}{" "}
+                          of {transcripts.length}
                           {activeTranscript.service && (
                             <span className="ml-1.5 text-xs font-normal text-[hsl(var(--text-muted))]">
                               · {formatServiceName(activeTranscript.service)}
@@ -1680,8 +1709,12 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
               {isTranscribing && (
                 <div className="mb-4 space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-[hsl(var(--cyan))]">{progressState.message}</span>
-                    <span className="tabular-nums text-[hsl(var(--text-muted))]">{progressState.progress}%</span>
+                    <span className="font-medium text-[hsl(var(--cyan))]">
+                      {progressState.message}
+                    </span>
+                    <span className="text-[hsl(var(--text-muted))] tabular-nums">
+                      {progressState.progress}%
+                    </span>
                   </div>
                   <Progress value={progressState.progress} variant="cyan" />
                   {progressState.detail && (
@@ -1756,7 +1789,10 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
                             </div>
 
                             {/* Speaker name (clickable to edit) */}
-                            <div className="relative" ref={editingSpeakerIdx === segIdx ? speakerPopoverRef : undefined}>
+                            <div
+                              className="relative"
+                              ref={editingSpeakerIdx === segIdx ? speakerPopoverRef : undefined}
+                            >
                               <button
                                 onClick={() => {
                                   setEditingSpeakerIdx(
@@ -1849,7 +1885,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
                                               <p className="truncate text-xs font-medium text-[hsl(var(--text))]">
                                                 {p.name}
                                               </p>
-                                              <p className="text-[10px] capitalize text-[hsl(var(--text-muted))]">
+                                              <p className="text-[10px] text-[hsl(var(--text-muted))] capitalize">
                                                 {p.role}
                                               </p>
                                             </div>
@@ -1874,20 +1910,25 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
                             </div>
 
                             {/* Timestamp */}
-                            <span className="ml-auto text-xs tabular-nums text-[hsl(var(--text-subtle))]">
+                            <span className="ml-auto text-xs text-[hsl(var(--text-subtle))] tabular-nums">
                               {formatTimestamp(segment.startTime)}
                             </span>
 
                             {/* Delete segment */}
                             <div className="relative">
                               <button
-                                onClick={() => setConfirmDeleteSegIdx(confirmDeleteSegIdx === segIdx ? null : segIdx)}
+                                onClick={() =>
+                                  setConfirmDeleteSegIdx(
+                                    confirmDeleteSegIdx === segIdx ? null : segIdx
+                                  )
+                                }
                                 className={cn(
                                   "rounded p-1 transition-colors",
                                   "text-[hsl(var(--text-ghost))]",
                                   "opacity-0 group-hover/seg:opacity-100",
                                   "hover:bg-[hsl(var(--error)/0.1)] hover:text-[hsl(var(--error))]",
-                                  confirmDeleteSegIdx === segIdx && "opacity-100 text-[hsl(var(--error))]"
+                                  confirmDeleteSegIdx === segIdx &&
+                                    "text-[hsl(var(--error))] opacity-100"
                                 )}
                                 title="Delete paragraph"
                               >
@@ -1897,7 +1938,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
                                 <div
                                   ref={confirmDeleteRef}
                                   className={cn(
-                                    "absolute right-0 top-full z-20 mt-1 w-48",
+                                    "absolute top-full right-0 z-20 mt-1 w-48",
                                     "rounded-lg border border-[hsl(var(--glass-border))]",
                                     "bg-[hsl(var(--raised))] p-3 shadow-xl"
                                   )}
@@ -2046,7 +2087,9 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
               </div>
 
               {/* Confidence threshold slider */}
-              {activeTranscript.words.some((w) => w.confidence !== undefined && w.confidence < 1) && (
+              {activeTranscript.words.some(
+                (w) => w.confidence !== undefined && w.confidence < 1
+              ) && (
                 <div className="mt-3 flex items-center gap-3">
                   <span className="shrink-0 text-xs text-[hsl(var(--text-subtle))]">
                     Confidence threshold
@@ -2057,10 +2100,12 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
                     max="0.8"
                     step="0.05"
                     value={settings.confidenceThreshold || 0}
-                    onChange={(e) => updateSettings({ confidenceThreshold: parseFloat(e.target.value) })}
+                    onChange={(e) =>
+                      updateSettings({ confidenceThreshold: parseFloat(e.target.value) })
+                    }
                     className="h-1 flex-1 accent-[hsl(var(--cyan))]"
                   />
-                  <span className="min-w-[2.5rem] text-right font-mono text-xs tabular-nums text-[hsl(var(--text-muted))]">
+                  <span className="min-w-[2.5rem] text-right font-mono text-xs text-[hsl(var(--text-muted))] tabular-nums">
                     {(settings.confidenceThreshold || 0) === 0
                       ? "Off"
                       : (settings.confidenceThreshold || 0).toFixed(2)}
@@ -2077,11 +2122,9 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
                 onSplit={handleMenuSplit}
                 onMerge={handleMenuMerge}
               />
-
             </CardContent>
           </Card>
         )}
-
       </div>
     </div>
   );

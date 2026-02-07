@@ -123,7 +123,10 @@ export const SpeakerLineup: React.FC<SpeakerLineupProps> = ({
               {/* Avatar */}
               <div
                 className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full"
-                style={{ backgroundColor: person?.photoUrl ? undefined : `${color}20`, borderColor: color }}
+                style={{
+                  backgroundColor: person?.photoUrl ? undefined : `${color}20`,
+                  borderColor: color,
+                }}
               >
                 {person?.photoUrl ? (
                   <img
@@ -137,12 +140,8 @@ export const SpeakerLineup: React.FC<SpeakerLineupProps> = ({
                   </span>
                 )}
               </div>
-              <span className="text-xs font-medium text-[hsl(var(--text))]">
-                {speaker.label}
-              </span>
-              {person && (
-                <PersonIcon className="h-3 w-3 text-[hsl(var(--text-muted))]" />
-              )}
+              <span className="text-xs font-medium text-[hsl(var(--text))]">{speaker.label}</span>
+              {person && <PersonIcon className="h-3 w-3 text-[hsl(var(--text-muted))]" />}
             </button>
 
             {/* Edit popover */}
@@ -225,7 +224,7 @@ export const SpeakerLineup: React.FC<SpeakerLineupProps> = ({
                                 <p className="truncate text-xs font-medium text-[hsl(var(--text))]">
                                   {p.name}
                                 </p>
-                                <p className="text-[10px] capitalize text-[hsl(var(--text-muted))]">
+                                <p className="text-[10px] text-[hsl(var(--text-muted))] capitalize">
                                   {p.role}
                                 </p>
                               </div>

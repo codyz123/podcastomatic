@@ -84,7 +84,9 @@ export function usePodcastPeople() {
 
         const { person } = await res.json();
         setPeople((prev) =>
-          prev.map((p) => (p.id === personId ? person : p)).sort((a, b) => a.name.localeCompare(b.name))
+          prev
+            .map((p) => (p.id === personId ? person : p))
+            .sort((a, b) => a.name.localeCompare(b.name))
         );
         return person;
       } catch (err) {

@@ -17,13 +17,15 @@ function ensureSegments(t: Transcript): Transcript {
   if (t.words.length === 0) return t;
   return {
     ...t,
-    segments: [{
-      speakerLabel: "Person 1",
-      startWordIndex: 0,
-      endWordIndex: t.words.length,
-      startTime: t.words[0]?.start ?? 0,
-      endTime: t.words[t.words.length - 1]?.end ?? 0,
-    }],
+    segments: [
+      {
+        speakerLabel: "Person 1",
+        startWordIndex: 0,
+        endWordIndex: t.words.length,
+        startTime: t.words[0]?.start ?? 0,
+        endTime: t.words[t.words.length - 1]?.end ?? 0,
+      },
+    ],
   };
 }
 
@@ -1015,7 +1017,11 @@ export const useProjectStore = create<ProjectState>()(
                 )
               : state.currentProject.transcript;
 
-            if (!activeTranscript?.segments || segmentIndex < 0 || segmentIndex >= activeTranscript.segments.length)
+            if (
+              !activeTranscript?.segments ||
+              segmentIndex < 0 ||
+              segmentIndex >= activeTranscript.segments.length
+            )
               return state;
 
             const seg = activeTranscript.segments[segmentIndex];
@@ -1251,7 +1257,7 @@ export const useProjectStore = create<ProjectState>()(
             // Preserve the user's active transcript selection if it's still valid
             const preferredId = project.activeTranscriptId;
             const activeTranscriptId =
-              (preferredId && transcripts.some((t) => t.id === preferredId))
+              preferredId && transcripts.some((t) => t.id === preferredId)
                 ? preferredId
                 : transcripts.length > 0
                   ? transcripts[transcripts.length - 1].id

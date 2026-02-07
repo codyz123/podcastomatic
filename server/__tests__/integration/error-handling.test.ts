@@ -108,7 +108,9 @@ describe("Error Handling", () => {
       .attach("file", audioBuffer, "test.mp3");
 
     expect(response.status).toBe(500);
-    expect(response.body.error).toBe("No transcription API key configured. Set ASSEMBLYAI_API_KEY or OPENAI_API_KEY.");
+    expect(response.body.error).toBe(
+      "No transcription API key configured. Set ASSEMBLYAI_API_KEY or OPENAI_API_KEY."
+    );
   });
 
   it("should provide actionable error messages", async () => {

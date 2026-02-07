@@ -447,13 +447,13 @@ export const Settings: React.FC = () => {
               </div>
 
               {/* Confidence threshold slider */}
-              <div className="mt-5 border-t border-[hsl(var(--glass-border))] pt-5 space-y-3">
+              <div className="mt-5 space-y-3 border-t border-[hsl(var(--glass-border))] pt-5">
                 <label className="block text-xs font-semibold tracking-wider text-[hsl(var(--text-subtle))] uppercase">
                   Music / Noise Filter
                 </label>
                 <p className="text-xs text-[hsl(var(--text-muted))]">
-                  Filter out low-confidence words from transcriptions (e.g. music lyrics, background noise).
-                  Higher values filter more aggressively. Set to 0 to disable.
+                  Filter out low-confidence words from transcriptions (e.g. music lyrics, background
+                  noise). Higher values filter more aggressively. Set to 0 to disable.
                 </p>
                 <div className="flex items-center gap-4">
                   <input
@@ -462,14 +462,18 @@ export const Settings: React.FC = () => {
                     max="0.8"
                     step="0.05"
                     value={settings.confidenceThreshold || 0}
-                    onChange={(e) => updateSettings({ confidenceThreshold: parseFloat(e.target.value) })}
+                    onChange={(e) =>
+                      updateSettings({ confidenceThreshold: parseFloat(e.target.value) })
+                    }
                     className="flex-1 accent-[hsl(var(--cyan))]"
                   />
-                  <span className={cn(
-                    "min-w-[3.5rem] rounded-md px-2 py-1 text-center text-sm font-mono tabular-nums",
-                    "bg-[hsl(var(--bg-base))] border border-[hsl(var(--border-subtle))]",
-                    "text-[hsl(var(--text))]"
-                  )}>
+                  <span
+                    className={cn(
+                      "min-w-[3.5rem] rounded-md px-2 py-1 text-center font-mono text-sm tabular-nums",
+                      "border border-[hsl(var(--border-subtle))] bg-[hsl(var(--bg-base))]",
+                      "text-[hsl(var(--text))]"
+                    )}
+                  >
                     {(settings.confidenceThreshold || 0).toFixed(2)}
                   </span>
                 </div>
@@ -481,7 +485,8 @@ export const Settings: React.FC = () => {
                 {(settings.confidenceThreshold || 0) > 0 && (
                   <p className="flex items-center gap-2 text-xs text-[hsl(var(--text-muted))]">
                     <InfoCircledIcon className="h-3.5 w-3.5 shrink-0" />
-                    Applies in real time to transcripts with confidence data. Older transcripts may need re-transcription.
+                    Applies in real time to transcripts with confidence data. Older transcripts may
+                    need re-transcription.
                   </p>
                 )}
               </div>

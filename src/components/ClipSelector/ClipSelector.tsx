@@ -318,7 +318,12 @@ export const ClipSelector: React.FC = () => {
         endTime: newEnd,
         words: newWords,
         transcript: newWords.map((w) => w.text).join(" "),
-        segments: computeClipSegments(transcript?.segments, transcript?.words || [], newStart, newEnd),
+        segments: computeClipSegments(
+          transcript?.segments,
+          transcript?.words || [],
+          newStart,
+          newEnd
+        ),
       });
     },
     [updateClip, transcript]
@@ -542,7 +547,12 @@ Return ONLY valid JSON in this exact format (no other text):
             endTime,
             transcript: segment.text || segmentWords.map((w) => w.text).join(" "),
             words: segmentWords,
-            segments: computeClipSegments(transcript.segments, transcript.words, startTime, endTime),
+            segments: computeClipSegments(
+              transcript.segments,
+              transcript.words,
+              startTime,
+              endTime
+            ),
             clippabilityScore,
             isManual: false,
           });
@@ -618,7 +628,6 @@ Return ONLY valid JSON in this exact format (no other text):
     return (
       <div className="min-h-full">
         <div className="mx-auto max-w-4xl">
-
           {/* AI Analysis Card */}
           <Card variant="default" className="animate-fadeIn mb-5">
             <CardContent className="p-4 sm:p-5">
@@ -1052,7 +1061,6 @@ Return ONLY valid JSON in this exact format (no other text):
           )}
         </div>
       </div>
-
     </div>
   );
 };
