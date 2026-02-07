@@ -859,6 +859,26 @@ function App() {
       string,
       { label: string; stage: EpisodeStage; subStage: string; isDisabled: boolean }
     > = {
+      // Planning steps
+      guests: {
+        label: "Topics",
+        stage: "planning",
+        subStage: "topics",
+        isDisabled: false,
+      },
+      topics: {
+        label: "Notes",
+        stage: "planning",
+        subStage: "notes",
+        isDisabled: false,
+      },
+      notes: {
+        label: "Record",
+        stage: "production",
+        subStage: "record",
+        isDisabled: false,
+      },
+      // Production / post-production / marketing steps
       record: {
         label: "Transcribe",
         stage: "post-production",
