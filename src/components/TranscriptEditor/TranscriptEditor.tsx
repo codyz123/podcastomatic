@@ -314,7 +314,7 @@ const TranscriptContextMenu = React.memo(
   )
 );
 
-export const TranscriptEditor: React.FC<TranscriptEditorProps> = () => {
+export const TranscriptEditor: React.FC = () => {
   const {
     currentProject,
     addTranscript,
