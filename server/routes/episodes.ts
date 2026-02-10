@@ -159,16 +159,13 @@ router.put(
       for (const key of allowedFields) {
         if (key in updates && updates[key] !== undefined) {
           const value = updates[key];
-          // Skip null values
-          if (value === null) continue;
-          // Handle date fields - convert empty strings to null, strings to Date objects
+          // Handle date fields — Drizzle calls .toISOString() on timestamp values,
+          // so we must pass a proper Date object or null (not a raw string)
           if (key === "publishDate") {
-            if (value === "" || value === null) {
+            if (!value || value === null) {
               filteredUpdates[key] = null;
-            } else if (typeof value === "string") {
-              filteredUpdates[key] = new Date(value);
             } else {
-              filteredUpdates[key] = value;
+              filteredUpdates[key] = value instanceof Date ? value : new Date(String(value));
             }
           } else {
             filteredUpdates[key] = value;

@@ -28,12 +28,7 @@ interface Guest {
 
 export const EpisodeInfoPage: React.FC = () => {
   const { currentProject, updateProject } = useProjectStore();
-  const { updateEpisode, updateStageStatus, error: episodeError } = useEpisodes();
-
-  // Debug: log on mount
-  useEffect(() => {
-    console.log("[EpisodeInfoPage] Mounted with project:", currentProject?.id);
-  }, [currentProject?.id]);
+  const { updateEpisode, updateStageStatus } = useEpisodes();
 
   const [metadata, setMetadata] = useState<EpisodeMetadata>({
     title: currentProject?.name || "",
@@ -78,7 +73,6 @@ export const EpisodeInfoPage: React.FC = () => {
   const handleSave = async () => {
     if (!currentProject) return;
 
-    console.log("[EpisodeInfoPage] Saving changes for project:", currentProject.id);
     setIsSaving(true);
     setSaveError(null);
     try {
@@ -92,26 +86,13 @@ export const EpisodeInfoPage: React.FC = () => {
         explicit: metadata.explicit,
         guests: metadata.guests,
       };
-      console.log("[EpisodeInfoPage] Updates:", updates);
 
-      // Persist to database
-      const savedEpisode = await updateEpisode(currentProject.id, updates);
-      console.log("[EpisodeInfoPage] Save result:", savedEpisode);
+      // Persist to database — throws on failure
+      await updateEpisode(currentProject.id, updates);
 
-      if (savedEpisode) {
-        // Update local store on success
-        updateProject(updates);
-        setIsDirty(false);
-        setSaveError(null);
-        console.log("[EpisodeInfoPage] Save successful");
-      } else {
-        // updateEpisode returned null - check for error from hook or show generic message
-        console.error(
-          "[EpisodeInfoPage] Save failed - updateEpisode returned null. episodeError:",
-          episodeError
-        );
-        setSaveError(episodeError || "Failed to save changes. Please try again.");
-      }
+      // Update local store on success
+      updateProject(updates);
+      setIsDirty(false);
     } catch (err) {
       console.error("[EpisodeInfoPage] Save error:", err);
       setSaveError(err instanceof Error ? err.message : "Failed to save changes");

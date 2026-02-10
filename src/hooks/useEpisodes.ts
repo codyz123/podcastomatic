@@ -201,46 +201,34 @@ export function useEpisodes() {
   // Update an episode
   const updateEpisode = useCallback(
     async (episodeId: string, updates: Partial<Episode>): Promise<Episode | null> => {
-      console.log(
-        "[useEpisodes.updateEpisode] Called with episodeId:",
-        episodeId,
-        "currentPodcastId:",
-        currentPodcastId
-      );
       if (!currentPodcastId) {
-        console.error("[useEpisodes.updateEpisode] No currentPodcastId - returning null");
-        return null;
+        throw new Error("No podcast selected");
       }
 
-      try {
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updates),
-          }
-        );
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to update episode");
+      const res = await authFetch(
+        `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(updates),
         }
+      );
 
-        const { episode } = await res.json();
-
-        // Update in local state
-        setEpisodes((prev) => prev.map((e) => (e.id === episodeId ? episode : e)));
-
-        if (currentEpisode?.id === episodeId) {
-          setCurrentEpisode((prev) => (prev ? { ...prev, ...episode } : null));
-        }
-
-        return episode;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to update episode");
-        return null;
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to update episode");
       }
+
+      const { episode } = await res.json();
+
+      // Update in local state
+      setEpisodes((prev) => prev.map((e) => (e.id === episodeId ? episode : e)));
+
+      if (currentEpisode?.id === episodeId) {
+        setCurrentEpisode((prev) => (prev ? { ...prev, ...episode } : null));
+      }
+
+      return episode;
     },
     [currentPodcastId, currentEpisode]
   );
