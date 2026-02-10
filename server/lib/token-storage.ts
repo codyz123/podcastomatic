@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import crypto from "crypto";
+import { toISOStringSafe } from "../utils/dates.js";
 
 // Token data structure
 export interface StoredToken {
@@ -203,11 +204,7 @@ export async function getAllTokenStatuses(): Promise<
   return platforms.map((platform) => {
     const token = tokenMap.get(platform);
     if (token) {
-      // expires_at may be a Date object or a string depending on the driver
-      const expiresAt =
-        token.expires_at instanceof Date
-          ? token.expires_at.toISOString()
-          : String(token.expires_at);
+      const expiresAt = toISOStringSafe(token.expires_at) as string;
       return {
         platform,
         connected: true,
