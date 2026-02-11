@@ -109,11 +109,6 @@ export async function initializeMediaTables(): Promise<void> {
   console.log("[Database] Media tables initialized");
 }
 
-// Build a proxied media URL (serves through our server to avoid CORS issues)
-function buildR2ProxyUrl(key: string): string {
-  return `${getLocalMediaBaseUrl()}/api/media/${key}`;
-}
-
 // Upload a file to R2
 export async function uploadMedia(
   file: Buffer,
@@ -123,8 +118,7 @@ export async function uploadMedia(
 ): Promise<{ url: string; size: number }> {
   if (isR2Configured()) {
     const key = `${folder}/${Date.now()}-${filename}`;
-    await uploadToR2(key, file, contentType);
-    return { url: buildR2ProxyUrl(key), size: file.length };
+    return uploadToR2(key, file, contentType);
   }
 
   const local = getLocalMediaPath(folder, filename);
@@ -146,8 +140,7 @@ export async function uploadMediaFromPath(
   if (isR2Configured()) {
     const key = `${folder}/${Date.now()}-${filename}`;
     const fileBuffer = readFileSync(filePath);
-    await uploadToR2(key, fileBuffer, contentType);
-    return { url: buildR2ProxyUrl(key), size: fileBuffer.length };
+    return uploadToR2(key, fileBuffer, contentType);
   }
 
   const local = getLocalMediaPath(folder, filename);
