@@ -1,7 +1,23 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "../stores/authStore";
 import { useProjectStore } from "../stores/projectStore";
 import { getApiBase, authFetch } from "../lib/api";
+import {
+  episodeKeys,
+  fetchEpisodesList,
+  fetchEpisodeDetail,
+  createEpisodeApi,
+  updateEpisodeApi,
+  deleteEpisodeApi,
+  uploadAudioApi,
+  saveTranscriptApi,
+  saveTranscriptSegmentsApi,
+  updateTranscriptApi,
+  saveClipsApi,
+  updateStageStatusApi,
+  updateSubStepStatusApi,
+} from "../lib/queries";
 import type { StageStatusWithSubSteps } from "../lib/statusConfig";
 
 // Episode type from backend
@@ -102,60 +118,48 @@ export interface EpisodeWithDetails extends Episode {
 
 export function useEpisodes() {
   const { currentPodcastId } = useAuthStore();
-  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const queryClient = useQueryClient();
+
+  // React Query for episodes list — handles caching, deduplication, and refetching
+  const {
+    data: episodes = [],
+    isLoading,
+    error: queryError,
+    refetch: refetchEpisodes,
+  } = useQuery({
+    queryKey: episodeKeys.all(currentPodcastId!),
+    queryFn: () => fetchEpisodesList(currentPodcastId!),
+    enabled: !!currentPodcastId,
+  });
+
+  // Keep currentEpisode as local state for compatibility with consumers
+  // that read it directly (though most use projectStore instead)
   const [currentEpisode, setCurrentEpisode] = useState<EpisodeWithDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch episodes for current podcast
+  // Sync query errors to local error state for backward compatibility
+  useEffect(() => {
+    if (queryError) {
+      setError(queryError instanceof Error ? queryError.message : "Failed to fetch episodes");
+    }
+  }, [queryError]);
+
+  // Fetch episodes (wrapper for backward compatibility — triggers React Query refetch)
   const fetchEpisodes = useCallback(async () => {
-    if (!currentPodcastId) {
-      setEpisodes([]);
-      return;
-    }
+    if (!currentPodcastId) return;
+    await refetchEpisodes();
+  }, [currentPodcastId, refetchEpisodes]);
 
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const res = await authFetch(`${getApiBase()}/api/podcasts/${currentPodcastId}/episodes`);
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to fetch episodes");
-      }
-
-      const { episodes: episodeList } = await res.json();
-      setEpisodes(episodeList);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch episodes");
-      setEpisodes([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentPodcastId]);
-
-  // Fetch a single episode with details
+  // Fetch a single episode with details — populates React Query cache
   const fetchEpisode = useCallback(
     async (episodeId: string): Promise<EpisodeWithDetails | null> => {
       if (!currentPodcastId) return null;
 
       try {
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}`
-        );
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to fetch episode");
-        }
-
-        const data = await res.json();
-        const episode: EpisodeWithDetails = {
-          ...data.episode,
-          transcripts: data.transcripts || [],
-          clips: data.clips || [],
-        };
+        const episode = await queryClient.fetchQuery({
+          queryKey: episodeKeys.detail(currentPodcastId, episodeId),
+          queryFn: () => fetchEpisodeDetail(currentPodcastId, episodeId),
+        });
 
         setCurrentEpisode(episode);
         return episode;
@@ -164,7 +168,7 @@ export function useEpisodes() {
         return null;
       }
     },
-    [currentPodcastId]
+    [currentPodcastId, queryClient]
   );
 
   // Create a new episode
@@ -173,21 +177,12 @@ export function useEpisodes() {
       if (!currentPodcastId) return null;
 
       try {
-        const res = await authFetch(`${getApiBase()}/api/podcasts/${currentPodcastId}/episodes`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, description }),
+        const episode = await createEpisodeApi(currentPodcastId, { name, description });
+
+        // Invalidate episodes list cache to pick up the new episode
+        await queryClient.invalidateQueries({
+          queryKey: episodeKeys.all(currentPodcastId),
         });
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to create episode");
-        }
-
-        const { episode } = await res.json();
-
-        // Refresh list
-        await fetchEpisodes();
 
         return episode;
       } catch (err) {
@@ -195,42 +190,24 @@ export function useEpisodes() {
         return null;
       }
     },
-    [currentPodcastId, fetchEpisodes]
+    [currentPodcastId, queryClient]
   );
 
   // Update an episode
   const updateEpisode = useCallback(
     async (episodeId: string, updates: Partial<Episode>): Promise<Episode | null> => {
-      console.log(
-        "[useEpisodes.updateEpisode] Called with episodeId:",
-        episodeId,
-        "currentPodcastId:",
-        currentPodcastId
-      );
-      if (!currentPodcastId) {
-        console.error("[useEpisodes.updateEpisode] No currentPodcastId - returning null");
-        return null;
-      }
+      if (!currentPodcastId) return null;
 
       try {
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updates),
-          }
-        );
+        const episode = await updateEpisodeApi(currentPodcastId, episodeId, updates);
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to update episode");
-        }
-
-        const { episode } = await res.json();
-
-        // Update in local state
-        setEpisodes((prev) => prev.map((e) => (e.id === episodeId ? episode : e)));
+        // Invalidate both the list and detail caches
+        queryClient.invalidateQueries({
+          queryKey: episodeKeys.all(currentPodcastId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: episodeKeys.detail(currentPodcastId, episodeId),
+        });
 
         if (currentEpisode?.id === episodeId) {
           setCurrentEpisode((prev) => (prev ? { ...prev, ...episode } : null));
@@ -242,7 +219,7 @@ export function useEpisodes() {
         return null;
       }
     },
-    [currentPodcastId, currentEpisode]
+    [currentPodcastId, currentEpisode, queryClient]
   );
 
   // Delete an episode
@@ -251,18 +228,15 @@ export function useEpisodes() {
       if (!currentPodcastId) return false;
 
       try {
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}`,
-          { method: "DELETE" }
-        );
+        await deleteEpisodeApi(currentPodcastId, episodeId);
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to delete episode");
-        }
-
-        // Update local state
-        setEpisodes((prev) => prev.filter((e) => e.id !== episodeId));
+        // Invalidate episodes list and remove detail from cache
+        queryClient.invalidateQueries({
+          queryKey: episodeKeys.all(currentPodcastId),
+        });
+        queryClient.removeQueries({
+          queryKey: episodeKeys.detail(currentPodcastId, episodeId),
+        });
 
         if (currentEpisode?.id === episodeId) {
           setCurrentEpisode(null);
@@ -274,7 +248,7 @@ export function useEpisodes() {
         return false;
       }
     },
-    [currentPodcastId, currentEpisode]
+    [currentPodcastId, currentEpisode, queryClient]
   );
 
   // Upload audio for an episode
@@ -283,29 +257,15 @@ export function useEpisodes() {
       if (!currentPodcastId) return null;
 
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        if (audioDuration !== undefined) {
-          formData.append("audioDuration", audioDuration.toString());
-        }
+        const episode = await uploadAudioApi(currentPodcastId, episodeId, file, audioDuration);
 
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}/audio`,
-          {
-            method: "POST",
-            body: formData,
-          }
-        );
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to upload audio");
-        }
-
-        const { episode } = await res.json();
-
-        // Update local state
-        setEpisodes((prev) => prev.map((e) => (e.id === episodeId ? episode : e)));
+        // Invalidate caches
+        queryClient.invalidateQueries({
+          queryKey: episodeKeys.all(currentPodcastId),
+        });
+        queryClient.invalidateQueries({
+          queryKey: episodeKeys.detail(currentPodcastId, episodeId),
+        });
 
         if (currentEpisode?.id === episodeId) {
           setCurrentEpisode((prev) => (prev ? { ...prev, ...episode } : null));
@@ -317,7 +277,7 @@ export function useEpisodes() {
         return null;
       }
     },
-    [currentPodcastId, currentEpisode]
+    [currentPodcastId, currentEpisode, queryClient]
   );
 
   // Save transcript
@@ -337,21 +297,12 @@ export function useEpisodes() {
       if (!currentPodcastId) return null;
 
       try {
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}/transcripts`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(transcript),
-          }
-        );
+        const saved = await saveTranscriptApi(currentPodcastId, episodeId, transcript);
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to save transcript");
-        }
-
-        const { transcript: saved } = await res.json();
+        // Invalidate detail cache
+        queryClient.invalidateQueries({
+          queryKey: episodeKeys.detail(currentPodcastId, episodeId),
+        });
 
         // Update current episode if it's the one we're working on
         if (currentEpisode?.id === episodeId) {
@@ -366,7 +317,7 @@ export function useEpisodes() {
         return null;
       }
     },
-    [currentPodcastId, currentEpisode]
+    [currentPodcastId, currentEpisode, queryClient]
   );
 
   // Save transcript segments (speaker labels)
@@ -379,20 +330,7 @@ export function useEpisodes() {
       if (!currentPodcastId) return false;
 
       try {
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}/transcripts/${transcriptId}/segments`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ segments }),
-          }
-        );
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to save transcript segments");
-        }
-
+        await saveTranscriptSegmentsApi(currentPodcastId, episodeId, transcriptId, segments);
         return true;
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to save transcript segments");
@@ -412,20 +350,7 @@ export function useEpisodes() {
       if (!currentPodcastId) return false;
 
       try {
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}/transcripts/${transcriptId}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(data),
-          }
-        );
-
-        if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error || "Failed to update transcript");
-        }
-
+        await updateTranscriptApi(currentPodcastId, episodeId, transcriptId, data);
         return true;
       } catch (err) {
         console.error("[useEpisodes] updateTranscript failed:", err);
@@ -437,25 +362,16 @@ export function useEpisodes() {
 
   // Save clips (bulk)
   const saveClips = useCallback(
-    async (episodeId: string, clips: Partial<Clip>[]): Promise<Clip[] | null> => {
+    async (episodeId: string, clipsList: Partial<Clip>[]): Promise<Clip[] | null> => {
       if (!currentPodcastId) return null;
 
       try {
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}/clips`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ clips }),
-          }
-        );
+        const saved = await saveClipsApi(currentPodcastId, episodeId, clipsList);
 
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to save clips");
-        }
-
-        const { clips: saved } = await res.json();
+        // Invalidate detail cache
+        queryClient.invalidateQueries({
+          queryKey: episodeKeys.detail(currentPodcastId, episodeId),
+        });
 
         // Update current episode if it's the one we're working on
         if (currentEpisode?.id === episodeId) {
@@ -468,7 +384,7 @@ export function useEpisodes() {
         return null;
       }
     },
-    [currentPodcastId, currentEpisode]
+    [currentPodcastId, currentEpisode, queryClient]
   );
 
   // Clear current episode
@@ -476,7 +392,7 @@ export function useEpisodes() {
     setCurrentEpisode(null);
   }, []);
 
-  // Update stage status
+  // Update stage status (with optimistic updates)
   const updateStageStatus = useCallback(
     async (
       episodeId: string,
@@ -493,10 +409,13 @@ export function useEpisodes() {
       };
 
       const applyStageStatus = (nextStageStatus: StageStatusWithSubSteps) => {
-        setEpisodes((prev) =>
-          prev.map((episode) =>
-            episode.id === episodeId ? { ...episode, stageStatus: nextStageStatus } : episode
-          )
+        // Optimistically update the React Query cache for the episodes list
+        queryClient.setQueryData(
+          episodeKeys.all(currentPodcastId),
+          (prev: Episode[] | undefined) =>
+            prev?.map((episode) =>
+              episode.id === episodeId ? { ...episode, stageStatus: nextStageStatus } : episode
+            ) ?? []
         );
 
         if (currentEpisode?.id === episodeId) {
@@ -512,32 +431,23 @@ export function useEpisodes() {
       applyStageStatus(optimisticStageStatus);
 
       try {
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}/stage-status`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ stage, status }),
-          }
+        const { stageStatus } = await updateStageStatusApi(
+          currentPodcastId,
+          episodeId,
+          stage,
+          status
         );
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to update stage status");
-        }
-
-        const { stageStatus } = await res.json();
         if (stageStatus) {
-          applyStageStatus(stageStatus);
+          applyStageStatus(stageStatus as StageStatusWithSubSteps);
         }
-        return stageStatus;
+        return stageStatus as StageStatusWithSubSteps;
       } catch (err) {
         applyStageStatus(previousStageStatus);
         setError(err instanceof Error ? err.message : "Failed to update stage status");
         return null;
       }
     },
-    [currentPodcastId, episodes, currentEpisode]
+    [currentPodcastId, episodes, currentEpisode, queryClient]
   );
 
   // Update sub-step status (granular tracking within stages)
@@ -561,10 +471,13 @@ export function useEpisodes() {
       };
 
       const applyStageStatus = (nextStageStatus: Episode["stageStatus"]) => {
-        setEpisodes((prev) =>
-          prev.map((episode) =>
-            episode.id === episodeId ? { ...episode, stageStatus: nextStageStatus } : episode
-          )
+        // Optimistically update the React Query cache for the episodes list
+        queryClient.setQueryData(
+          episodeKeys.all(currentPodcastId),
+          (prev: Episode[] | undefined) =>
+            prev?.map((episode) =>
+              episode.id === episodeId ? { ...episode, stageStatus: nextStageStatus } : episode
+            ) ?? []
         );
 
         if (currentEpisode?.id === episodeId) {
@@ -580,32 +493,23 @@ export function useEpisodes() {
       applyStageStatus(optimisticStageStatus);
 
       try {
-        const res = await authFetch(
-          `${getApiBase()}/api/podcasts/${currentPodcastId}/episodes/${episodeId}/substep-status`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ subStepId, status }),
-          }
+        const { stageStatus } = await updateSubStepStatusApi(
+          currentPodcastId,
+          episodeId,
+          subStepId,
+          status
         );
-
-        if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.error || "Failed to update sub-step status");
-        }
-
-        const { stageStatus } = await res.json();
         if (stageStatus) {
-          applyStageStatus(stageStatus);
+          applyStageStatus(stageStatus as Episode["stageStatus"]);
         }
-        return stageStatus;
+        return stageStatus as Episode["stageStatus"];
       } catch (err) {
         applyStageStatus(previousStageStatus);
         setError(err instanceof Error ? err.message : "Failed to update sub-step status");
         return null;
       }
     },
-    [currentPodcastId, episodes, currentEpisode]
+    [currentPodcastId, episodes, currentEpisode, queryClient]
   );
 
   // Track if we've attempted migration in this session
@@ -724,8 +628,10 @@ export function useEpisodes() {
       }
     }
 
-    // Refresh episodes list after migration
-    await fetchEpisodes();
+    // Invalidate episodes list cache to pick up migrated data
+    await queryClient.invalidateQueries({
+      queryKey: episodeKeys.all(currentPodcastId),
+    });
 
     // Mark migration as complete
     localStorage.setItem(MIGRATION_FLAG, new Date().toISOString());
@@ -735,20 +641,7 @@ export function useEpisodes() {
     localStorage.removeItem("podcastomatic-projects");
 
     console.log("[Migration] Migration complete. localStorage projects cleared.");
-  }, [currentPodcastId, fetchEpisodes]);
-
-  // Fetch episodes when podcast changes, then migrate if needed
-  useEffect(() => {
-    if (currentPodcastId) {
-      fetchEpisodes().then(() => {
-        // After fetching, check if we need to migrate
-        // We'll do this in a separate effect to access the latest episodes state
-      });
-    } else {
-      setEpisodes([]);
-      setCurrentEpisode(null);
-    }
-  }, [currentPodcastId, fetchEpisodes]);
+  }, [currentPodcastId, queryClient]);
 
   // Trigger migration if database is empty but localStorage has data
   useEffect(() => {
@@ -773,7 +666,7 @@ export function useEpisodes() {
     episodes,
     currentEpisode,
     isLoading,
-    error,
+    error: error || (queryError instanceof Error ? queryError.message : null),
     fetchEpisodes,
     fetchEpisode,
     createEpisode,
