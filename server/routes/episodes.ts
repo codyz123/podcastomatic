@@ -70,24 +70,22 @@ router.get(
       const podcastId = getParam(req.params.podcastId);
       const episodeId = getParam(req.params.episodeId);
 
-      const [episode] = await db
-        .select()
-        .from(projects)
-        .where(and(eq(projects.id, episodeId), eq(projects.podcastId, podcastId)));
+      // Run all three queries in parallel to minimize Neon serverless round-trips
+      const [episodeResult, episodeTranscripts, episodeClips] = await Promise.all([
+        db
+          .select()
+          .from(projects)
+          .where(and(eq(projects.id, episodeId), eq(projects.podcastId, podcastId))),
+        db.select().from(transcripts).where(eq(transcripts.projectId, episodeId)),
+        db.select().from(clips).where(eq(clips.projectId, episodeId)),
+      ]);
+
+      const episode = episodeResult[0];
 
       if (!episode) {
         res.status(404).json({ error: "Episode not found" });
         return;
       }
-
-      // Get transcripts
-      const episodeTranscripts = await db
-        .select()
-        .from(transcripts)
-        .where(eq(transcripts.projectId, episodeId));
-
-      // Get clips
-      const episodeClips = await db.select().from(clips).where(eq(clips.projectId, episodeId));
 
       res.json({
         episode,
@@ -648,61 +646,76 @@ router.put(
         return;
       }
 
-      const savedClips = [];
-      for (const clipData of clipList) {
-        // Check if clip exists
-        const existing = clipData.id
-          ? await db.select().from(clips).where(eq(clips.id, clipData.id))
-          : [];
+      // Pre-fetch all existing clip IDs for this episode in one query
+      // instead of checking existence per-clip (N+1 → 1 query)
+      const existingClips = await db
+        .select({ id: clips.id })
+        .from(clips)
+        .where(eq(clips.projectId, episodeId));
+      const existingIds = new Set(existingClips.map((c) => c.id));
 
-        if (existing.length > 0) {
-          // Update
-          const [updated] = await db
-            .update(clips)
-            .set({
-              name: clipData.name,
-              startTime: clipData.startTime,
-              endTime: clipData.endTime,
-              transcript: clipData.transcript,
-              words: clipData.words,
-              clippabilityScore: clipData.clippabilityScore,
-              tracks: clipData.tracks,
-              captionStyle: clipData.captionStyle,
-              segments: clipData.segments,
-              format: clipData.format,
-              templateId: clipData.templateId,
-              background: clipData.background,
-              subtitle: clipData.subtitle,
-              updatedAt: new Date(),
-            })
-            .where(eq(clips.id, clipData.id))
-            .returning();
-          savedClips.push(updated);
-        } else {
-          // Insert
-          const [created] = await db
-            .insert(clips)
-            .values({
+      // Partition into inserts vs updates
+      const toInsert = clipList.filter(
+        (c: Record<string, unknown>) => !c.id || !existingIds.has(c.id as string)
+      );
+      const toUpdate = clipList.filter(
+        (c: Record<string, unknown>) => c.id && existingIds.has(c.id as string)
+      );
+
+      const savedClips: unknown[] = [];
+
+      // Batch insert all new clips in a single query
+      if (toInsert.length > 0) {
+        const inserted = await db
+          .insert(clips)
+          .values(
+            toInsert.map((clipData: Record<string, unknown>) => ({
               projectId: episodeId,
-              name: clipData.name,
-              startTime: clipData.startTime,
-              endTime: clipData.endTime,
-              transcript: clipData.transcript,
-              words: clipData.words || [],
+              name: clipData.name as string,
+              startTime: clipData.startTime as number,
+              endTime: clipData.endTime as number,
+              transcript: clipData.transcript as string | undefined,
+              words: (clipData.words as unknown[]) || [],
               clippabilityScore: clipData.clippabilityScore,
-              isManual: clipData.isManual || false,
-              templateId: clipData.templateId,
+              isManual: (clipData.isManual as boolean) || false,
+              templateId: clipData.templateId as string | undefined,
               background: clipData.background,
               subtitle: clipData.subtitle,
               tracks: clipData.tracks,
               captionStyle: clipData.captionStyle,
               segments: clipData.segments,
-              format: clipData.format,
+              format: clipData.format as string | undefined,
               createdById: userId,
-            })
-            .returning();
-          savedClips.push(created);
-        }
+            }))
+          )
+          .returning();
+        savedClips.push(...inserted);
+      }
+
+      // Update existing clips (still per-clip due to Drizzle ORM limitations,
+      // but we eliminated the per-clip SELECT existence check)
+      for (const clipData of toUpdate) {
+        const [updated] = await db
+          .update(clips)
+          .set({
+            name: clipData.name,
+            startTime: clipData.startTime,
+            endTime: clipData.endTime,
+            transcript: clipData.transcript,
+            words: clipData.words,
+            clippabilityScore: clipData.clippabilityScore,
+            tracks: clipData.tracks,
+            captionStyle: clipData.captionStyle,
+            segments: clipData.segments,
+            format: clipData.format,
+            templateId: clipData.templateId,
+            background: clipData.background,
+            subtitle: clipData.subtitle,
+            updatedAt: new Date(),
+          })
+          .where(eq(clips.id, clipData.id))
+          .returning();
+        savedClips.push(updated);
       }
 
       res.json({ clips: savedClips, count: savedClips.length });
