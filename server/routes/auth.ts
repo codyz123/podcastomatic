@@ -1,7 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db, users, podcasts, podcastMembers } from "../db/index.js";
 import { eq } from "drizzle-orm";
-import { toProxyUrl } from "../lib/media-storage.js";
 import {
   hashPassword,
   verifyPassword,
@@ -223,13 +222,7 @@ authRouter.get("/me", jwtAuthMiddleware, async (req: Request, res: Response) => 
       .innerJoin(podcasts, eq(podcasts.id, podcastMembers.podcastId))
       .where(eq(podcastMembers.userId, user.id));
 
-    res.json({
-      user,
-      podcasts: userPodcasts.map((p) => ({
-        ...p,
-        coverImageUrl: toProxyUrl(p.coverImageUrl),
-      })),
-    });
+    res.json({ user, podcasts: userPodcasts });
   } catch (error) {
     console.error("Get user error:", error);
     res.status(500).json({ error: "Failed to get user" });

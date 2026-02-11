@@ -5,7 +5,7 @@ import { eq, and, gt } from "drizzle-orm";
 import { jwtAuthMiddleware } from "../middleware/auth.js";
 import { generateInvitationToken } from "../services/authService.js";
 import { sendInvitationEmail, getEmailConfigStatus } from "../services/emailService.js";
-import { uploadMedia, toProxyUrl } from "../lib/media-storage.js";
+import { uploadMedia } from "../lib/media-storage.js";
 
 export const podcastsRouter = Router();
 
@@ -47,12 +47,7 @@ podcastsRouter.get("/", async (req: Request, res: Response) => {
       .innerJoin(podcasts, eq(podcasts.id, podcastMembers.podcastId))
       .where(eq(podcastMembers.userId, req.user!.userId));
 
-    res.json({
-      podcasts: userPodcasts.map((p) => ({
-        ...p,
-        coverImageUrl: toProxyUrl(p.coverImageUrl),
-      })),
-    });
+    res.json({ podcasts: userPodcasts });
   } catch (error) {
     console.error("List podcasts error:", error);
     res.status(500).json({ error: "Failed to list podcasts" });
@@ -144,7 +139,7 @@ podcastsRouter.get("/:id", async (req: Request, res: Response) => {
       );
 
     res.json({
-      podcast: { ...podcast, coverImageUrl: toProxyUrl(podcast.coverImageUrl) },
+      podcast,
       members,
       pendingInvitations: invitations,
       currentUserRole: membership.role,
@@ -191,9 +186,7 @@ podcastsRouter.put("/:id", async (req: Request, res: Response) => {
       .where(eq(podcasts.id, id))
       .returning();
 
-    res.json({
-      podcast: { ...updated, coverImageUrl: toProxyUrl(updated.coverImageUrl) },
-    });
+    res.json({ podcast: updated });
   } catch (error) {
     console.error("Update podcast error:", error);
     res.status(500).json({ error: "Failed to update podcast" });

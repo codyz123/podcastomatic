@@ -5,7 +5,7 @@ import { db } from "../db/index.js";
 import { podcastPeople } from "../db/schema.js";
 import { jwtAuthMiddleware } from "../middleware/auth.js";
 import { getParam, verifyPodcastAccess } from "../middleware/podcast-access.js";
-import { uploadMedia, deleteMedia, toProxyUrl } from "../lib/media-storage.js";
+import { uploadMedia, deleteMedia } from "../lib/media-storage.js";
 
 const router = Router();
 
@@ -36,9 +36,7 @@ router.get("/:podcastId/people", verifyPodcastAccess, async (req: Request, res: 
       .where(eq(podcastPeople.podcastId, podcastId))
       .orderBy(asc(podcastPeople.name));
 
-    res.json({
-      people: people.map((p) => ({ ...p, photoUrl: toProxyUrl(p.photoUrl) })),
-    });
+    res.json({ people });
   } catch (error) {
     console.error("Error listing podcast people:", error);
     res.status(500).json({ error: (error as Error).message });

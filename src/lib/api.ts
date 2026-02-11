@@ -42,6 +42,25 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
 }
 
 /**
+ * Convert a media URL to go through our server proxy to avoid CORS issues.
+ * Handles direct R2 URLs by routing them through /api/media/ on the backend.
+ */
+export function getMediaUrl(url: string | undefined | null): string | undefined {
+  if (!url) return undefined;
+  // Already going through our server
+  if (url.includes("/api/media/") || url.includes("/api/local-media/")) return url;
+  // External URL (likely R2) - extract the path and proxy through our backend
+  try {
+    const parsed = new URL(url);
+    const key = parsed.pathname.slice(1);
+    if (key) return `${getApiBase()}/api/media/${key}`;
+  } catch {
+    // Not a valid URL, return as-is
+  }
+  return url;
+}
+
+/**
  * Standard API error type
  */
 export interface ApiError {

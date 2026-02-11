@@ -1,13 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import { readFileSync, copyFileSync, mkdirSync, statSync, writeFileSync } from "fs";
 import path from "node:path";
-import {
-  uploadToR2,
-  deleteFromR2ByUrl,
-  listR2Objects,
-  isR2Configured,
-  getKeyFromR2Url,
-} from "./r2-storage.js";
+import { uploadToR2, deleteFromR2ByUrl, listR2Objects, isR2Configured } from "./r2-storage.js";
 
 // Get database connection
 function getDb() {
@@ -115,25 +109,6 @@ export async function initializeMediaTables(): Promise<void> {
   console.log("[Database] Media tables initialized");
 }
 
-// Build a proxied media URL (serves through our server to avoid CORS issues)
-function buildR2ProxyUrl(key: string): string {
-  return `${getLocalMediaBaseUrl()}/api/media/${key}`;
-}
-
-/**
- * Convert a direct R2 URL to a proxy URL through our server.
- * Returns the original URL if it's not an R2 URL or is already proxied.
- */
-export function toProxyUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  // Already a proxy or local URL
-  if (url.includes("/api/media/") || url.includes("/api/local-media/")) return url;
-  // Try to extract R2 key and build proxy URL
-  const key = getKeyFromR2Url(url);
-  if (key) return buildR2ProxyUrl(key);
-  return url;
-}
-
 // Upload a file to R2
 export async function uploadMedia(
   file: Buffer,
@@ -143,8 +118,7 @@ export async function uploadMedia(
 ): Promise<{ url: string; size: number }> {
   if (isR2Configured()) {
     const key = `${folder}/${Date.now()}-${filename}`;
-    await uploadToR2(key, file, contentType);
-    return { url: buildR2ProxyUrl(key), size: file.length };
+    return uploadToR2(key, file, contentType);
   }
 
   const local = getLocalMediaPath(folder, filename);
@@ -166,8 +140,7 @@ export async function uploadMediaFromPath(
   if (isR2Configured()) {
     const key = `${folder}/${Date.now()}-${filename}`;
     const fileBuffer = readFileSync(filePath);
-    await uploadToR2(key, fileBuffer, contentType);
-    return { url: buildR2ProxyUrl(key), size: fileBuffer.length };
+    return uploadToR2(key, fileBuffer, contentType);
   }
 
   const local = getLocalMediaPath(folder, filename);
