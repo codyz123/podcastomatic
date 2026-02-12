@@ -193,31 +193,28 @@ export function useEpisodes() {
     [currentPodcastId, queryClient]
   );
 
-  // Update an episode
+  // Update an episode — throws on failure so callers (e.g. debounced autosave) can handle errors
   const updateEpisode = useCallback(
     async (episodeId: string, updates: Partial<Episode>): Promise<Episode | null> => {
-      if (!currentPodcastId) return null;
-
-      try {
-        const episode = await updateEpisodeApi(currentPodcastId, episodeId, updates);
-
-        // Invalidate both the list and detail caches
-        queryClient.invalidateQueries({
-          queryKey: episodeKeys.all(currentPodcastId),
-        });
-        queryClient.invalidateQueries({
-          queryKey: episodeKeys.detail(currentPodcastId, episodeId),
-        });
-
-        if (currentEpisode?.id === episodeId) {
-          setCurrentEpisode((prev) => (prev ? { ...prev, ...episode } : null));
-        }
-
-        return episode;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to update episode");
-        return null;
+      if (!currentPodcastId) {
+        throw new Error("No podcast selected");
       }
+
+      const episode = await updateEpisodeApi(currentPodcastId, episodeId, updates);
+
+      // Invalidate both the list and detail caches
+      queryClient.invalidateQueries({
+        queryKey: episodeKeys.all(currentPodcastId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: episodeKeys.detail(currentPodcastId, episodeId),
+      });
+
+      if (currentEpisode?.id === episodeId) {
+        setCurrentEpisode((prev) => (prev ? { ...prev, ...episode } : null));
+      }
+
+      return episode;
     },
     [currentPodcastId, currentEpisode, queryClient]
   );

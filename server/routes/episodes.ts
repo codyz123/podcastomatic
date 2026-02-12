@@ -6,6 +6,7 @@ import { projects, transcripts, clips } from "../db/schema.js";
 import { jwtAuthMiddleware } from "../middleware/auth.js";
 import { getParam, verifyPodcastAccess } from "../middleware/podcast-access.js";
 import { uploadMediaFromPath, deleteMedia } from "../lib/media-storage.js";
+import { toDateSafe } from "../utils/dates.js";
 import { randomUUID } from "crypto";
 import { unlink } from "fs/promises";
 import { tmpdir } from "os";
@@ -161,17 +162,10 @@ router.put(
       for (const key of allowedFields) {
         if (key in updates && updates[key] !== undefined) {
           const value = updates[key];
-          // Skip null values
-          if (value === null) continue;
-          // Handle date fields - convert empty strings to null, strings to Date objects
+          // Drizzle calls .toISOString() on timestamp values, so date fields
+          // must be a proper Date object or null (not a raw string).
           if (key === "publishDate") {
-            if (value === "" || value === null) {
-              filteredUpdates[key] = null;
-            } else if (typeof value === "string") {
-              filteredUpdates[key] = new Date(value);
-            } else {
-              filteredUpdates[key] = value;
-            }
+            filteredUpdates[key] = toDateSafe(value);
           } else {
             filteredUpdates[key] = value;
           }
