@@ -106,7 +106,7 @@ export async function initializeMediaTables(): Promise<void> {
     )
   `;
 
-  console.log("[Database] Media tables initialized");
+  console.warn("[Database] Media tables initialized");
 }
 
 // Upload a file to R2
