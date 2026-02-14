@@ -104,7 +104,7 @@ export const ClipSelector: React.FC = () => {
     refreshClipWords();
   }, [refreshClipWords]);
 
-  const clips = currentProject?.clips || [];
+  const clips = useMemo(() => currentProject?.clips || [], [currentProject?.clips]);
   const transcript = currentProject?.transcript;
   const activeClip = clips[activeClipIndex] || null;
 
@@ -177,7 +177,7 @@ export const ClipSelector: React.FC = () => {
       pendingSyncFnRef.current = null;
       saveClips(currentProject.id, clips)
         .then(() => {
-          console.log("[ClipSelector] Synced", clips.length, "clips to backend");
+          console.warn("[ClipSelector] Synced", clips.length, "clips to backend");
         })
         .catch((err) => {
           console.error("[ClipSelector] Failed to sync clips:", err);
@@ -371,6 +371,7 @@ export const ClipSelector: React.FC = () => {
         audio.currentTime = activeClip.startTime;
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only run on clip identity change or audio load; adding full activeClip would reset playhead on every edit
   }, [activeClip?.id, audioUrl]);
 
   const playClip = useCallback(
@@ -619,7 +620,21 @@ export const ClipSelector: React.FC = () => {
     setProgress(10);
 
     try {
-      let analysis: { segments: any[] };
+      let analysis: {
+        segments: Array<{
+          start_time: number;
+          end_time: number;
+          text?: string;
+          explanation?: string;
+          scores: {
+            hook: number;
+            clarity: number;
+            emotion: number;
+            quotable: number;
+            completeness: number;
+          };
+        }>;
+      };
 
       if (useBackend) {
         // Use backend endpoint
@@ -749,6 +764,11 @@ Return ONLY valid JSON in this exact format (no other text):
 
       setProgress(90);
 
+      if (!currentProject) {
+        setError("No project loaded");
+        return;
+      }
+
       const MAX_OVERLAP_SECONDS = 5;
       const allSegments = analysis.segments || [];
 
@@ -815,7 +835,7 @@ Return ONLY valid JSON in this exact format (no other text):
           };
 
           addClip({
-            projectId: currentProject!.id,
+            projectId: currentProject.id,
             name: `Clip ${startingClipNumber + addedCount}`,
             startTime,
             endTime,
@@ -866,6 +886,11 @@ Return ONLY valid JSON in this exact format (no other text):
       return;
     }
 
+    if (!currentProject) {
+      setError("No project loaded");
+      return;
+    }
+
     const eps = 0.05;
     const segmentWords = transcript.words.filter(
       (w) => w.start >= start - eps && w.end <= end + eps
@@ -873,7 +898,7 @@ Return ONLY valid JSON in this exact format (no other text):
 
     const clipNumber = clips.length + 1;
     addClip({
-      projectId: currentProject!.id,
+      projectId: currentProject.id,
       name: `Clip ${clipNumber}`,
       startTime: start,
       endTime: end,

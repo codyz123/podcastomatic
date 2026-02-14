@@ -163,8 +163,8 @@ export function useEpisodes() {
     error: queryError,
     refetch: refetchEpisodes,
   } = useQuery({
-    queryKey: episodeKeys.all(currentPodcastId!),
-    queryFn: () => fetchEpisodesList(currentPodcastId!),
+    queryKey: episodeKeys.all(currentPodcastId ?? ""),
+    queryFn: () => fetchEpisodesList(currentPodcastId ?? ""),
     enabled: !!currentPodcastId,
   });
 
@@ -229,31 +229,28 @@ export function useEpisodes() {
     [currentPodcastId, queryClient]
   );
 
-  // Update an episode
+  // Update an episode — throws on failure so callers (e.g. debounced autosave) can handle errors
   const updateEpisode = useCallback(
     async (episodeId: string, updates: Partial<Episode>): Promise<Episode | null> => {
-      if (!currentPodcastId) return null;
-
-      try {
-        const episode = await updateEpisodeApi(currentPodcastId, episodeId, updates);
-
-        // Invalidate both the list and detail caches
-        queryClient.invalidateQueries({
-          queryKey: episodeKeys.all(currentPodcastId),
-        });
-        queryClient.invalidateQueries({
-          queryKey: episodeKeys.detail(currentPodcastId, episodeId),
-        });
-
-        if (currentEpisode?.id === episodeId) {
-          setCurrentEpisode((prev) => (prev ? { ...prev, ...episode } : null));
-        }
-
-        return episode;
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to update episode");
-        return null;
+      if (!currentPodcastId) {
+        throw new Error("No podcast selected");
       }
+
+      const episode = await updateEpisodeApi(currentPodcastId, episodeId, updates);
+
+      // Invalidate both the list and detail caches
+      queryClient.invalidateQueries({
+        queryKey: episodeKeys.all(currentPodcastId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: episodeKeys.detail(currentPodcastId, episodeId),
+      });
+
+      if (currentEpisode?.id === episodeId) {
+        setCurrentEpisode((prev) => (prev ? { ...prev, ...episode } : null));
+      }
+
+      return episode;
     },
     [currentPodcastId, currentEpisode, queryClient]
   );
@@ -561,7 +558,7 @@ export function useEpisodes() {
     // Check if migration was already done (persisted in localStorage)
     const MIGRATION_FLAG = "podcastomatic-migrated-to-db";
     if (localStorage.getItem(MIGRATION_FLAG)) {
-      console.log("[Migration] Already migrated previously, skipping");
+      console.warn("[Migration] Already migrated previously, skipping");
       return;
     }
 
@@ -573,12 +570,12 @@ export function useEpisodes() {
     const localProjects = useProjectStore.getState().projects;
 
     if (localProjects.length === 0) {
-      console.log("[Migration] No localStorage projects to migrate");
+      console.warn("[Migration] No localStorage projects to migrate");
       localStorage.setItem(MIGRATION_FLAG, new Date().toISOString());
       return;
     }
 
-    console.log(`[Migration] Found ${localProjects.length} localStorage projects to migrate`);
+    console.warn(`[Migration] Found ${localProjects.length} localStorage projects to migrate`);
 
     // Migrate each project
     for (const project of localProjects) {
@@ -599,7 +596,7 @@ export function useEpisodes() {
         }
 
         const { episode } = await res.json();
-        console.log(`[Migration] Migrated project "${project.name}" -> episode ${episode.id}`);
+        console.warn(`[Migration] Migrated project "${project.name}" -> episode ${episode.id}`);
 
         // If project has transcripts, migrate them too
         const transcripts = project.transcripts || [];
@@ -623,7 +620,7 @@ export function useEpisodes() {
                 }),
               }
             );
-            console.log(`[Migration] Migrated transcript for "${project.name}"`);
+            console.warn(`[Migration] Migrated transcript for "${project.name}"`);
           } catch (err) {
             console.error(`[Migration] Failed to migrate transcript:`, err);
           }
@@ -657,7 +654,7 @@ export function useEpisodes() {
                 }),
               }
             );
-            console.log(`[Migration] Migrated ${clips.length} clips for "${project.name}"`);
+            console.warn(`[Migration] Migrated ${clips.length} clips for "${project.name}"`);
           } catch (err) {
             console.error(`[Migration] Failed to migrate clips:`, err);
           }
@@ -679,7 +676,7 @@ export function useEpisodes() {
     useProjectStore.setState({ projects: [] });
     localStorage.removeItem("podcastomatic-projects");
 
-    console.log("[Migration] Migration complete. localStorage projects cleared.");
+    console.warn("[Migration] Migration complete. localStorage projects cleared.");
   }, [currentPodcastId, queryClient]);
 
   // Trigger migration if database is empty but localStorage has data
@@ -695,7 +692,7 @@ export function useEpisodes() {
       const localProjects = useProjectStore.getState().projects;
       if (localProjects.length > 0) {
         migrationAttemptedRef.current = true; // Set BEFORE calling async function
-        console.log("[Migration] Database empty, localStorage has data. Starting migration...");
+        console.warn("[Migration] Database empty, localStorage has data. Starting migration...");
         migrateLocalStorageProjects();
       }
     }

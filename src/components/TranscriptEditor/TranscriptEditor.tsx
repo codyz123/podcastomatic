@@ -603,6 +603,7 @@ export const TranscriptEditor: React.FC = () => {
     }, 2000);
 
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only trigger on text/id changes; adding full objects would reset debounce timer on unrelated store updates
   }, [activeTranscript?.text, activeTranscript?.id, currentProject?.id, updateTranscript]);
 
   // Flush pending transcript save on unmount (e.g., navigating away)
@@ -679,11 +680,17 @@ export const TranscriptEditor: React.FC = () => {
   };
 
   const buildTranscriptWords = (
-    rawWords: any[],
+    rawWords: Array<{
+      word: string;
+      start: number;
+      end: number;
+      confidence?: number;
+      probability?: number;
+    }>,
     fallbackText?: string
   ): { words: Word[]; indexMap: number[] } => {
     const mapped =
-      rawWords?.map((w: any) => ({
+      rawWords?.map((w) => ({
         text: w.word,
         start: w.start,
         end: w.end,
@@ -1048,7 +1055,24 @@ export const TranscriptEditor: React.FC = () => {
         // Read SSE stream
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
-        let transcriptResponse: any = null;
+        let transcriptResponse: {
+          words?: Array<{
+            word: string;
+            start: number;
+            end: number;
+            confidence?: number;
+            probability?: number;
+          }>;
+          text?: string;
+          segments?: SpeakerSegment[];
+          language?: string;
+          service?: string;
+          stage?: string;
+          error?: string;
+          progress?: number;
+          message?: string;
+          detail?: string;
+        } | null = null;
 
         if (reader) {
           let buffer = "";
@@ -1389,7 +1413,7 @@ export const TranscriptEditor: React.FC = () => {
       const target = (e.target as HTMLElement).closest("[data-word-index]") as HTMLElement | null;
 
       if (target) {
-        nearestIndex = parseInt(target.getAttribute("data-word-index")!, 10);
+        nearestIndex = parseInt(target.getAttribute("data-word-index") ?? "-1", 10);
       } else {
         // Probe nearby points for clicks in gaps between words
         for (const [dx, dy] of [
@@ -1404,7 +1428,7 @@ export const TranscriptEditor: React.FC = () => {
           const wordEl =
             el && ((el as HTMLElement).closest("[data-word-index]") as HTMLElement | null);
           if (wordEl) {
-            nearestIndex = parseInt(wordEl.getAttribute("data-word-index")!, 10);
+            nearestIndex = parseInt(wordEl.getAttribute("data-word-index") ?? "-1", 10);
             break;
           }
         }
@@ -1688,7 +1712,7 @@ export const TranscriptEditor: React.FC = () => {
                 <p className="mx-auto mb-5 max-w-xs text-sm text-[hsl(var(--text-subtle))]">
                   {currentProject?.mediaType === "video"
                     ? "Using video source audio tracks with speaker diarization"
-                    : settings.assemblyaiApiKey || process.env.ASSEMBLYAI_API_KEY
+                    : settings.assemblyaiApiKey
                       ? "Using AssemblyAI with speaker diarization"
                       : "Using OpenAI Whisper for accurate word-level timestamps"}
                 </p>

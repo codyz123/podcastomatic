@@ -2,6 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { readFileSync, copyFileSync, mkdirSync, statSync, writeFileSync } from "fs";
 import path from "node:path";
 import { uploadToR2, deleteFromR2ByUrl, listR2Objects, isR2Configured } from "./r2-storage.js";
+import { toISOStringSafe } from "../utils/dates.js";
 
 // Get database connection
 function getDb() {
@@ -106,7 +107,7 @@ export async function initializeMediaTables(): Promise<void> {
     )
   `;
 
-  console.log("[Database] Media tables initialized");
+  console.warn("[Database] Media tables initialized");
 }
 
 // Upload a file to R2
@@ -224,8 +225,8 @@ export async function getProject(id: string): Promise<{
     sourceBlobUrl: row.source_blob_url as string | undefined,
     transcript: row.transcript as object | undefined,
     durationSeconds: row.duration_seconds as number | undefined,
-    createdAt: (row.created_at as Date).toISOString(),
-    updatedAt: (row.updated_at as Date).toISOString(),
+    createdAt: toISOStringSafe(row.created_at) as string,
+    updatedAt: toISOStringSafe(row.updated_at) as string,
   };
 }
 
@@ -251,8 +252,8 @@ export async function listProjects(): Promise<
     id: row.id as string,
     name: row.name as string,
     durationSeconds: row.duration_seconds as number | undefined,
-    createdAt: (row.created_at as Date).toISOString(),
-    updatedAt: (row.updated_at as Date).toISOString(),
+    createdAt: toISOStringSafe(row.created_at) as string,
+    updatedAt: toISOStringSafe(row.updated_at) as string,
   }));
 }
 
@@ -361,8 +362,8 @@ export async function getClipsForProject(projectId: string): Promise<
     background: row.background as object | undefined,
     subtitle: row.subtitle as object | undefined,
     format: row.format as string | undefined,
-    createdAt: (row.created_at as Date).toISOString(),
-    updatedAt: (row.updated_at as Date).toISOString(),
+    createdAt: toISOStringSafe(row.created_at) as string,
+    updatedAt: toISOStringSafe(row.updated_at) as string,
   }));
 }
 
@@ -444,7 +445,7 @@ export async function getMediaAssetsForProject(projectId: string): Promise<
     width: row.width as number | undefined,
     height: row.height as number | undefined,
     metadata: row.metadata as object | undefined,
-    createdAt: (row.created_at as Date).toISOString(),
+    createdAt: toISOStringSafe(row.created_at) as string,
   }));
 }
 
@@ -512,6 +513,6 @@ export async function getRenderedClipsForClip(clipId: string): Promise<
     format: row.format as string,
     blobUrl: row.blob_url as string,
     sizeBytes: row.size_bytes as number | undefined,
-    renderedAt: (row.rendered_at as Date).toISOString(),
+    renderedAt: toISOStringSafe(row.rendered_at) as string,
   }));
 }

@@ -125,7 +125,7 @@ export const useSettingsStore = create<SettingsState>()(
         defaultTemplate: "minimal-dark",
         defaultFormats: ["9:16"] as VideoFormat[],
         defaultClipDuration: 30,
-        autoSaveInterval: 30,
+
         confidenceThreshold: 0,
       },
       templates: DEFAULT_TEMPLATES,
@@ -221,8 +221,10 @@ export const useSettingsStore = create<SettingsState>()(
           }
         };
       },
-      migrate: (persistedState: any, version: number) => {
-        let state = persistedState;
+      migrate: (persistedState: unknown, version: number) => {
+        let state = persistedState as Record<string, unknown> & {
+          settings?: Partial<AppSettings>;
+        };
 
         // Migration v2 -> v3: update backend config
         if (version < 3) {

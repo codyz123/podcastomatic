@@ -33,7 +33,11 @@ router.post(
       const podcastId = req.params.podcastId as string;
       const episodeId = req.params.episodeId as string;
       const { filename, contentType, totalBytes } = req.body;
-      const userId = req.user!.userId;
+      if (!req.user) {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
+      const userId = req.user.userId;
 
       // Validate access
       if (!(await verifyAccess(userId, podcastId))) {
@@ -106,6 +110,12 @@ router.post(
     try {
       const sessionId = req.params.sessionId as string;
       const partNumber = parseInt(req.params.partNumber as string, 10);
+
+      if (isNaN(partNumber) || partNumber < 0) {
+        res.status(400).json({ error: "Invalid part number" });
+        return;
+      }
+
       const chunk = req.body as Buffer; // From express.raw()
 
       if (!Buffer.isBuffer(chunk) || chunk.length === 0) {
@@ -299,7 +309,11 @@ router.get(
   jwtAuthMiddleware,
   async (req: Request, res: Response) => {
     const episodeId = req.params.episodeId as string;
-    const userId = req.user!.userId;
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    const userId = req.user.userId;
 
     const [session] = await db
       .select()

@@ -115,7 +115,7 @@ export const VideoEditor: React.FC<VideoEditorProps> = () => {
   const pendingSaveFnRef = useRef<(() => void) | null>(null);
   const lastSavedSignatureRef = useRef<string>("");
 
-  const clips = currentProject?.clips || [];
+  const clips = useMemo(() => currentProject?.clips || [], [currentProject?.clips]);
   const activeClip = clips.find((c) => c.id === activeClipId) || clips[0] || null;
   const activeClipIndex = clips.findIndex((c) => c.id === activeClipId);
   const clipDuration = activeClip ? activeClip.endTime - activeClip.startTime : 0;
@@ -262,6 +262,7 @@ export const VideoEditor: React.FC<VideoEditorProps> = () => {
     if (!activeClip) return;
     const nextTemplateId = activeClip.templateId || settings.defaultTemplate;
     setSelectedTemplateId(nextTemplateId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Only sync on clip identity/templateId change; adding full activeClip would re-run on every edit
   }, [activeClip?.id, activeClip?.templateId, settings.defaultTemplate]);
 
   // Initialize template snapshot on clips that don't have one yet
@@ -280,6 +281,7 @@ export const VideoEditor: React.FC<VideoEditorProps> = () => {
     if (Object.keys(updates).length > 0) {
       updateClip(activeClip.id, updates);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- All activeClip properties individually listed; adding full object causes infinite loop (effect calls updateClip)
   }, [
     activeClip?.id,
     activeClip?.templateId,
@@ -1023,7 +1025,7 @@ export const VideoEditor: React.FC<VideoEditorProps> = () => {
   );
 
   const selectedTemplate = useMemo<VideoTemplate>(() => {
-    const fallback = templates.find((t) => t.id === selectedTemplateId) || templates[0]!;
+    const fallback = templates.find((t) => t.id === selectedTemplateId) ?? templates[0];
     if (activeClip?.background || activeClip?.subtitle) {
       return {
         ...fallback,
